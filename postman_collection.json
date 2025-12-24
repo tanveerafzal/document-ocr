@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "OCR API",
+    "description": "API collection for OCR text extraction from images and PDFs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://ocr-api-960587958424.us-central1.run.app",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Check the health status of the OCR service and verify EasyOCR and Tesseract availability."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "OCR",
+      "item": [
+        {
+          "name": "Extract Text from Image",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image file (PNG, JPG, JPEG, TIFF, BMP, WEBP)"
+                },
+                {
+                  "key": "languages",
+                  "value": "en",
+                  "type": "text",
+                  "description": "Comma-separated language codes (e.g., 'en,fr,de')"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/image?languages=en",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "image"],
+              "query": [
+                {
+                  "key": "languages",
+                  "value": "en",
+                  "description": "Comma-separated language codes"
+                }
+              ]
+            },
+            "description": "Extract text from an uploaded image using EasyOCR.\n\nSupported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP\n\nReturns extracted text with confidence scores and bounding boxes."
+          },
+          "response": []
+        },
+        {
+          "name": "Extract Text from PDF",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "PDF file to process"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/pdf?force_ocr=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "pdf"],
+              "query": [
+                {
+                  "key": "force_ocr",
+                  "value": "false",
+                  "description": "Force OCR even if PDF contains text (use true for scanned documents)"
+                }
+              ]
+            },
+            "description": "Extract text from an uploaded PDF using OCRmyPDF/Tesseract.\n\nSet force_ocr=true to process scanned documents.\n\nReturns extracted text per page with metadata."
+          },
+          "response": []
+        },
+        {
+          "name": "Extract Text from PDF (Force OCR)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Scanned PDF file to process"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/pdf?force_ocr=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "pdf"],
+              "query": [
+                {
+                  "key": "force_ocr",
+                  "value": "true",
+                  "description": "Force OCR for scanned documents"
+                }
+              ]
+            },
+            "description": "Extract text from a scanned PDF using OCRmyPDF/Tesseract with forced OCR.\n\nUse this for scanned documents or image-based PDFs."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documentation",
+      "item": [
+        {
+          "name": "API Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Get API information and available endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs",
+              "host": ["{{baseUrl}}"],
+              "path": ["docs"]
+            },
+            "description": "Interactive Swagger UI documentation."
+          },
+          "response": []
+        },
+        {
+          "name": "ReDoc",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/redoc",
+              "host": ["{{baseUrl}}"],
+              "path": ["redoc"]
+            },
+            "description": "ReDoc API documentation."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
