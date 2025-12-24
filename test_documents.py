@@ -2,10 +2,10 @@
 Test script to process all documents in a folder using the OCR Extract API.
 
 Usage:
-    python test_documents.py <folder_path> [--api-url URL] [--api-key KEY]
+    python test_documents.py <folder_path> [--api-url URL] [--api-key KEY] [--concurrency N]
 
 Example:
-    python test_documents.py ./test_images --api-url http://localhost:8080 --api-key mykey
+    python test_documents.py ./test_images --api-url http://localhost:8080 --api-key mykey --concurrency 5
 """
 
 import os
@@ -14,9 +14,27 @@ import json
 import argparse
 import requests
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+import time
 
 
 SUPPORTED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.webp'}
+
+# Thread-safe counter
+class Counter:
+    def __init__(self):
+        self.success = 0
+        self.fail = 0
+        self.lock = threading.Lock()
+
+    def add_success(self):
+        with self.lock:
+            self.success += 1
+
+    def add_fail(self):
+        with self.lock:
+            self.fail += 1
 
 
 def process_document(file_path: Path, api_url: str, api_key: str) -> dict:
@@ -54,9 +72,46 @@ def save_result(file_path: Path, result: dict):
     return output_path
 
 
-def process_folder(folder_path: str, api_url: str, api_key: str):
+def process_single_file(image_file: Path, api_url: str, api_key: str, counter: Counter, total: int, print_lock: threading.Lock):
     """
-    Process all documents in a folder.
+    Process a single file (used by thread pool).
+    """
+    try:
+        result = process_document(image_file, api_url, api_key)
+        output_path = save_result(image_file, result)
+
+        with print_lock:
+            if result.get("success"):
+                counter.add_success()
+                print(f"[OK] {image_file.name}")
+                print(f"     Name: {result.get('first_name')} {result.get('last_name')}")
+                print(f"     Doc#: {result.get('document_number')} | DOB: {result.get('date_of_birth')}")
+            else:
+                counter.add_fail()
+                print(f"[FAIL] {image_file.name}")
+                print(f"     {result.get('error', 'Unknown error')}")
+                if result.get("missing_fields"):
+                    print(f"     Missing: {', '.join(result['missing_fields'])}")
+            print(f"     Saved: {output_path.name}")
+            print()
+
+        return result
+
+    except requests.exceptions.ConnectionError:
+        with print_lock:
+            counter.add_fail()
+            print(f"[ERROR] {image_file.name} - Cannot connect to API")
+        return None
+    except Exception as e:
+        with print_lock:
+            counter.add_fail()
+            print(f"[ERROR] {image_file.name} - {str(e)}")
+        return None
+
+
+def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: int = 1):
+    """
+    Process all documents in a folder with optional concurrency.
     """
     folder = Path(folder_path)
 
@@ -79,43 +134,43 @@ def process_folder(folder_path: str, api_url: str, api_key: str):
         print(f"Supported formats: {', '.join(SUPPORTED_EXTENSIONS)}")
         sys.exit(0)
 
-    print(f"Found {len(image_files)} image(s) to process\n")
+    print(f"Found {len(image_files)} image(s) to process")
+    print(f"Concurrency: {concurrency} parallel request(s)")
+    print("-" * 60 + "\n")
+
+    counter = Counter()
+    print_lock = threading.Lock()
+    total = len(image_files)
+    start_time = time.time()
+
+    if concurrency == 1:
+        # Sequential processing
+        for image_file in image_files:
+            process_single_file(image_file, api_url, api_key, counter, total, print_lock)
+    else:
+        # Parallel processing
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = {
+                executor.submit(
+                    process_single_file,
+                    image_file,
+                    api_url,
+                    api_key,
+                    counter,
+                    total,
+                    print_lock
+                ): image_file
+                for image_file in image_files
+            }
+
+            # Wait for all to complete
+            for future in as_completed(futures):
+                pass  # Results already handled in process_single_file
+
+    elapsed = time.time() - start_time
     print("-" * 60)
-
-    success_count = 0
-    fail_count = 0
-
-    for i, image_file in enumerate(image_files, 1):
-        print(f"\n[{i}/{len(image_files)}] Processing: {image_file.name}")
-
-        try:
-            result = process_document(image_file, api_url, api_key)
-            output_path = save_result(image_file, result)
-
-            if result.get("success"):
-                success_count += 1
-                print(f"  ✓ Success")
-                print(f"    Name: {result.get('first_name')} {result.get('last_name')}")
-                print(f"    Doc#: {result.get('document_number')}")
-                print(f"    DOB: {result.get('date_of_birth')}")
-            else:
-                fail_count += 1
-                print(f"  ✗ Failed: {result.get('error', 'Unknown error')}")
-                if result.get("missing_fields"):
-                    print(f"    Missing: {', '.join(result['missing_fields'])}")
-
-            print(f"  → Saved: {output_path.name}")
-
-        except requests.exceptions.ConnectionError:
-            fail_count += 1
-            print(f"  ✗ Error: Cannot connect to API at {api_url}")
-            print("    Make sure the server is running")
-        except Exception as e:
-            fail_count += 1
-            print(f"  ✗ Error: {str(e)}")
-
-    print("\n" + "-" * 60)
-    print(f"\nCompleted: {success_count} succeeded, {fail_count} failed")
+    print(f"\nCompleted: {counter.success} succeeded, {counter.fail} failed")
+    print(f"Total time: {elapsed:.2f}s ({elapsed/total:.2f}s per document)")
 
 
 def main():
@@ -136,6 +191,12 @@ def main():
         default=os.environ.get("API_KEY", ""),
         help="API key for authentication (or set API_KEY env var)"
     )
+    parser.add_argument(
+        "--concurrency", "-c",
+        type=int,
+        default=1,
+        help="Number of parallel requests (default: 1)"
+    )
 
     args = parser.parse_args()
 
@@ -147,7 +208,7 @@ def main():
     print(f"Folder: {args.folder}")
     print("-" * 60)
 
-    process_folder(args.folder, args.api_url, args.api_key)
+    process_folder(args.folder, args.api_url, args.api_key, args.concurrency)
 
 
 if __name__ == "__main__":
