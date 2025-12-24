@@ -1,21 +1,38 @@
-# OCR API
+# Document OCR API
 
-FastAPI-based OCR service for extracting text from images and PDFs.
+FastAPI-based OCR service for extracting text and structured data from identity documents.
 
 ## Features
 
 - **Image OCR**: Extract text from images using EasyOCR (supports 80+ languages)
 - **PDF OCR**: Extract text from PDFs using OCRmyPDF/Tesseract
-- **JSON Response**: Returns text, confidence scores, bounding boxes, and page info
+- **Document Extraction**: Extract structured fields from ID documents using Claude Haiku Vision
+- **API Key Authentication**: Secure endpoints with API key
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/ocr/image` | POST | Extract text from image |
-| `/ocr/pdf` | POST | Extract text from PDF |
+| `/health` | GET | Health check (no auth required) |
+| `/ocr/image` | POST | Extract raw text from image |
+| `/ocr/pdf` | POST | Extract raw text from PDF |
+| `/ocr/extract/image` | POST | Extract structured document fields |
 | `/docs` | GET | Swagger UI documentation |
+
+## Authentication
+
+All `/ocr/*` endpoints require an API key in the header:
+
+```
+X-API-Key: your-api-key-here
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `API_KEY` | API key for authentication |
+| `ANTHROPIC_API_KEY` | Claude API key for document extraction |
 
 ## Local Development
 
@@ -23,12 +40,24 @@ FastAPI-based OCR service for extracting text from images and PDFs.
 
 - Python 3.11+
 - Tesseract OCR installed
-- OCRmyPDF installed
+- Anthropic API key
 
 ### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
+```
+
+### Set Environment Variables
+
+```bash
+# Windows PowerShell
+$env:API_KEY="your-api-key"
+$env:ANTHROPIC_API_KEY="your-anthropic-key"
+
+# Linux/Mac
+export API_KEY=your-api-key
+export ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
 ### Run Server
@@ -48,7 +77,10 @@ docker build -t ocr-api .
 ### Run
 
 ```bash
-docker run -p 8080:8080 ocr-api
+docker run -p 8080:8080 \
+  -e API_KEY=your-api-key \
+  -e ANTHROPIC_API_KEY=your-anthropic-key \
+  ocr-api
 ```
 
 ## Deploy to Google Cloud Run
@@ -62,56 +94,65 @@ gcloud run deploy ocr-api \
   --image gcr.io/PROJECT_ID/ocr-api \
   --platform managed \
   --region us-central1 \
-  --allow-unauthenticated \
   --memory 2Gi \
-  --cpu 2
+  --cpu 2 \
+  --set-env-vars API_KEY=your-key,ANTHROPIC_API_KEY=your-key
 ```
 
 ## Usage Examples
 
-### Extract text from image
+### Extract structured fields from ID document
 
 ```bash
-curl -X POST "http://localhost:8080/ocr/image" \
-  -F "file=@document.png" \
-  -F "languages=en"
+curl -X POST "http://localhost:8080/ocr/extract/image" \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@id-card.png"
 ```
 
-### Extract text from PDF
-
-```bash
-curl -X POST "http://localhost:8080/ocr/pdf" \
-  -F "file=@document.pdf" \
-  -F "force_ocr=false"
-```
-
-## Response Format
-
+**Response:**
 ```json
 {
   "success": true,
-  "filename": "document.png",
-  "file_type": "image",
-  "text": "Extracted text here...",
-  "pages": [
-    {
-      "page_number": 1,
-      "text": "Extracted text here...",
-      "confidence": 0.95,
-      "blocks": [
-        {
-          "text": "Word",
-          "confidence": 0.98,
-          "bounding_box": {
-            "x_min": 10,
-            "y_min": 20,
-            "x_max": 50,
-            "y_max": 40
-          }
-        }
-      ]
-    }
-  ],
-  "processing_time_seconds": 2.34
+  "first_name": "John",
+  "last_name": "Doe",
+  "full_name": "John Michael Doe",
+  "document_number": "D12345678",
+  "date_of_birth": "01/15/1990",
+  "issue_date": "03/20/2020",
+  "expiry_date": "03/20/2030",
+  "gender": "M",
+  "address": "123 Main St, City, State 12345",
+  "processing_time_seconds": 1.5
 }
 ```
+
+### Extract raw text from image
+
+```bash
+curl -X POST "http://localhost:8080/ocr/image" \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@document.png"
+```
+
+### Extract raw text from PDF
+
+```bash
+curl -X POST "http://localhost:8080/ocr/pdf" \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@document.pdf"
+```
+
+## Required Fields
+
+The `/ocr/extract/image` endpoint validates these required fields:
+- `first_name`
+- `last_name`
+- `document_number`
+- `date_of_birth`
+- `expiry_date`
+
+If any required field is missing, `success` will be `false` and `missing_fields` will list them.
+
+## Cost
+
+Uses Claude 3 Haiku Vision: ~$0.0005 per document (~$15/month for 1,000 docs/day)

@@ -2,15 +2,16 @@ import time
 from typing import Optional
 from io import BytesIO
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, Query
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Depends
 from PIL import Image
 
 from app.models.responses import OCRResponse, PageResult, DocumentExtractResponse
 from app.services.image_ocr import ImageOCRService
 from app.services.pdf_ocr import PDFOCRService
 from app.services.document_extractor import DocumentExtractorService
+from app.auth import verify_api_key
 
-router = APIRouter(prefix="/ocr", tags=["ocr"])
+router = APIRouter(prefix="/ocr", tags=["ocr"], dependencies=[Depends(verify_api_key)])
 
 ALLOWED_IMAGE_TYPES = {
     "image/png",
