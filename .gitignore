@@ -39,3 +39,22 @@ htmlcov/
 .pytest_cache/
 
 .easyocr/
+
+# Test output files
+*.json
+!postman_collection.json
+
+# Test images
+test_image.png
+test_*.png
+test_*.jpg
+
+# Local scripts
+run_server.bat
+
+# Claude settings
+.claude/
+
+# Temp files
+*.txt
+!README.md

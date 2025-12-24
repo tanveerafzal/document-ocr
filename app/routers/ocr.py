@@ -1,8 +1,10 @@
 import time
+import logging
 from typing import Optional
 from io import BytesIO
+from datetime import datetime
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Depends
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Depends, Request
 from PIL import Image
 
 from app.models.responses import OCRResponse, PageResult, DocumentExtractResponse
@@ -10,6 +12,10 @@ from app.services.image_ocr import ImageOCRService
 from app.services.pdf_ocr import PDFOCRService
 from app.services.document_extractor import DocumentExtractorService
 from app.auth import verify_api_key
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ocr", tags=["ocr"], dependencies=[Depends(verify_api_key)])
 
@@ -144,6 +150,7 @@ async def extract_text_from_pdf(
 
 @router.post("/extract/image", response_model=DocumentExtractResponse)
 async def extract_document_from_image(
+    request: Request,
     file: UploadFile = File(...)
 ) -> DocumentExtractResponse:
     """
@@ -153,7 +160,17 @@ async def extract_document_from_image(
 
     Returns extracted fields like name, document number, dates, etc.
     """
+    request_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Log request
+    logger.info(f"[{request_id}] REQUEST: /ocr/extract/image")
+    logger.info(f"[{request_id}]   Client IP: {client_ip}")
+    logger.info(f"[{request_id}]   Filename: {file.filename}")
+    logger.info(f"[{request_id}]   Content-Type: {file.content_type}")
+
     if file.content_type not in ALLOWED_IMAGE_TYPES:
+        logger.warning(f"[{request_id}]   Rejected: Unsupported file type")
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type: {file.content_type}. "
@@ -164,6 +181,8 @@ async def extract_document_from_image(
 
     try:
         image_bytes = await file.read()
+        file_size_kb = len(image_bytes) / 1024
+        logger.info(f"[{request_id}]   File size: {file_size_kb:.2f} KB")
 
         # Map content type to Claude's expected media type
         media_type_map = {
@@ -193,7 +212,7 @@ async def extract_document_from_image(
 
         processing_time = time.time() - start_time
 
-        return DocumentExtractResponse(
+        response = DocumentExtractResponse(
             success=is_valid,
             first_name=extracted_fields.get("first_name"),
             last_name=extracted_fields.get("last_name"),
@@ -209,8 +228,23 @@ async def extract_document_from_image(
             error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
         )
 
+        # Log response
+        logger.info(f"[{request_id}] RESPONSE:")
+        logger.info(f"[{request_id}]   Success: {response.success}")
+        logger.info(f"[{request_id}]   Name: {response.first_name} {response.last_name}")
+        logger.info(f"[{request_id}]   Doc#: {response.document_number}")
+        logger.info(f"[{request_id}]   DOB: {response.date_of_birth}")
+        logger.info(f"[{request_id}]   Processing time: {response.processing_time_seconds}s")
+        if not is_valid:
+            logger.info(f"[{request_id}]   Missing fields: {missing_fields}")
+
+        return response
+
     except Exception as e:
         processing_time = time.time() - start_time
+        logger.error(f"[{request_id}] ERROR: {str(e)}")
+        logger.error(f"[{request_id}]   Processing time: {round(processing_time, 3)}s")
+
         return DocumentExtractResponse(
             success=False,
             processing_time_seconds=round(processing_time, 3),
