@@ -1,13 +1,18 @@
 {
   "info": {
-    "name": "OCR API",
-    "description": "API collection for OCR text extraction from images and PDFs",
+    "name": "Document OCR API",
+    "description": "API collection for OCR text extraction and document field extraction using Claude Haiku Vision",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://ocr-api-960587958424.us-central1.run.app",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "your-api-key-here",
       "type": "string"
     }
   ],
@@ -25,7 +30,44 @@
               "host": ["{{baseUrl}}"],
               "path": ["health"]
             },
-            "description": "Check the health status of the OCR service and verify EasyOCR and Tesseract availability."
+            "description": "Check the health status of the OCR service and verify EasyOCR and Tesseract availability.\n\nNo authentication required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Document Extraction",
+      "item": [
+        {
+          "name": "Extract Document Fields from Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "ID document image (PNG, JPG, JPEG, TIFF, BMP, WEBP)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/extract/image",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "extract", "image"]
+            },
+            "description": "Extract structured fields from an ID document image using Claude Haiku Vision.\n\nExtracts: first_name, last_name, full_name, document_number, date_of_birth, issue_date, expiry_date, gender, address\n\nRequired fields: first_name, last_name, document_number, date_of_birth, expiry_date\n\nReturns success=false if required fields are missing."
           },
           "response": []
         }
@@ -38,7 +80,14 @@
           "name": "Extract Text from Image",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -47,12 +96,6 @@
                   "type": "file",
                   "src": "",
                   "description": "Image file (PNG, JPG, JPEG, TIFF, BMP, WEBP)"
-                },
-                {
-                  "key": "languages",
-                  "value": "en",
-                  "type": "text",
-                  "description": "Comma-separated language codes (e.g., 'en,fr,de')"
                 }
               ]
             },
@@ -64,11 +107,11 @@
                 {
                   "key": "languages",
                   "value": "en",
-                  "description": "Comma-separated language codes"
+                  "description": "Comma-separated language codes (e.g., 'en,fr,de')"
                 }
               ]
             },
-            "description": "Extract text from an uploaded image using EasyOCR.\n\nSupported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP\n\nReturns extracted text with confidence scores and bounding boxes."
+            "description": "Extract raw text from an uploaded image using EasyOCR.\n\nSupported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP\n\nReturns extracted text with confidence scores and bounding boxes."
           },
           "response": []
         },
@@ -76,7 +119,14 @@
           "name": "Extract Text from PDF",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -108,7 +158,14 @@
           "name": "Extract Text from PDF (Force OCR)",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -166,20 +223,6 @@
               "path": ["docs"]
             },
             "description": "Interactive Swagger UI documentation."
-          },
-          "response": []
-        },
-        {
-          "name": "ReDoc",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/redoc",
-              "host": ["{{baseUrl}}"],
-              "path": ["redoc"]
-            },
-            "description": "ReDoc API documentation."
           },
           "response": []
         }
