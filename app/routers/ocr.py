@@ -6,6 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Depends, Request
 from PIL import Image
+import fitz
 
 from app.models.responses import OCRResponse, PageResult, DocumentExtractResponse
 from app.services.image_ocr import ImageOCRService
@@ -148,13 +149,18 @@ async def extract_text_from_pdf(
         )
 
 
+ALLOWED_EXTRACT_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_PDF_TYPES
+
+
 @router.post("/extract/image", response_model=DocumentExtractResponse)
 async def extract_document_from_image(
     request: Request,
     file: UploadFile = File(...)
 ) -> DocumentExtractResponse:
     """
-    Extract structured document fields from an image using Claude Vision (Haiku).
+    Extract structured document fields from an image or PDF using Claude Vision (Haiku).
+
+    Supported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP, PDF
 
     Required fields: first_name, last_name, document_number, date_of_birth, expiry_date
 
@@ -169,45 +175,62 @@ async def extract_document_from_image(
     logger.info(f"[{request_id}]   Filename: {file.filename}")
     logger.info(f"[{request_id}]   Content-Type: {file.content_type}")
 
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
+    if file.content_type not in ALLOWED_EXTRACT_TYPES:
         logger.warning(f"[{request_id}]   Rejected: Unsupported file type")
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type: {file.content_type}. "
-                   f"Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
+                   f"Allowed types: {', '.join(ALLOWED_EXTRACT_TYPES)}"
         )
 
     start_time = time.time()
 
     try:
-        image_bytes = await file.read()
-        file_size_kb = len(image_bytes) / 1024
+        file_bytes = await file.read()
+        file_size_kb = len(file_bytes) / 1024
         logger.info(f"[{request_id}]   File size: {file_size_kb:.2f} KB")
 
-        # Detect actual image format from bytes (don't trust client Content-Type)
-        img = Image.open(BytesIO(image_bytes))
-        detected_format = img.format.upper() if img.format else None
+        # Handle PDF files - convert first page to image
+        if file.content_type == "application/pdf":
+            logger.info(f"[{request_id}]   Processing PDF - converting first page to image")
+            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if len(pdf_doc) == 0:
+                raise ValueError("PDF has no pages")
+            page = pdf_doc[0]
+            # Render at 2x resolution for better quality
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat)
+            image_bytes = pix.tobytes("png")
+            pdf_doc.close()
+            media_type = "image/png"
+            detected_format = "PNG (from PDF)"
+        else:
+            image_bytes = file_bytes
+            # Detect actual image format from bytes (don't trust client Content-Type)
+            img = Image.open(BytesIO(image_bytes))
+            detected_format = img.format.upper() if img.format else None
+
+            # Map detected format to Claude's expected media type
+            format_to_media_type = {
+                "PNG": "image/png",
+                "JPEG": "image/jpeg",
+                "JPG": "image/jpeg",
+                "WEBP": "image/webp",
+                "GIF": "image/gif",
+                "TIFF": "image/png",  # Will be converted
+                "BMP": "image/png",   # Will be converted
+            }
+            media_type = format_to_media_type.get(detected_format, "image/png")
+
+            # For TIFF/BMP, convert to PNG (img already opened above)
+            if detected_format in ["TIFF", "BMP"]:
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                output = BytesIO()
+                img.save(output, format="PNG")
+                image_bytes = output.getvalue()
+
         logger.info(f"[{request_id}]   Detected format: {detected_format}")
-
-        # Map detected format to Claude's expected media type
-        format_to_media_type = {
-            "PNG": "image/png",
-            "JPEG": "image/jpeg",
-            "JPG": "image/jpeg",
-            "WEBP": "image/webp",
-            "GIF": "image/gif",
-            "TIFF": "image/png",  # Will be converted
-            "BMP": "image/png",   # Will be converted
-        }
-        media_type = format_to_media_type.get(detected_format, "image/png")
-
-        # For TIFF/BMP, convert to PNG (img already opened above)
-        if detected_format in ["TIFF", "BMP"]:
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-            output = BytesIO()
-            img.save(output, format="PNG")
-            image_bytes = output.getvalue()
 
         extracted_fields, is_valid, missing_fields = DocumentExtractorService.extract_from_image(
             image_bytes,
