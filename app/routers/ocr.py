@@ -184,21 +184,25 @@ async def extract_document_from_image(
         file_size_kb = len(image_bytes) / 1024
         logger.info(f"[{request_id}]   File size: {file_size_kb:.2f} KB")
 
-        # Map content type to Claude's expected media type
-        media_type_map = {
-            "image/png": "image/png",
-            "image/jpeg": "image/jpeg",
-            "image/jpg": "image/jpeg",
-            "image/webp": "image/webp",
-            "image/gif": "image/gif",
-            "image/tiff": "image/png",
-            "image/bmp": "image/png",
-        }
-        media_type = media_type_map.get(file.content_type, "image/png")
+        # Detect actual image format from bytes (don't trust client Content-Type)
+        img = Image.open(BytesIO(image_bytes))
+        detected_format = img.format.upper() if img.format else None
+        logger.info(f"[{request_id}]   Detected format: {detected_format}")
 
-        # For TIFF/BMP, convert to PNG
-        if file.content_type in ["image/tiff", "image/bmp"]:
-            img = Image.open(BytesIO(image_bytes))
+        # Map detected format to Claude's expected media type
+        format_to_media_type = {
+            "PNG": "image/png",
+            "JPEG": "image/jpeg",
+            "JPG": "image/jpeg",
+            "WEBP": "image/webp",
+            "GIF": "image/gif",
+            "TIFF": "image/png",  # Will be converted
+            "BMP": "image/png",   # Will be converted
+        }
+        media_type = format_to_media_type.get(detected_format, "image/png")
+
+        # For TIFF/BMP, convert to PNG (img already opened above)
+        if detected_format in ["TIFF", "BMP"]:
             if img.mode != "RGB":
                 img = img.convert("RGB")
             output = BytesIO()
