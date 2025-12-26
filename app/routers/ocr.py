@@ -5,8 +5,10 @@ from io import BytesIO
 from datetime import datetime
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Query, Depends, Request
+from fastapi.responses import Response
 from PIL import Image
 import fitz
+import zipfile
 
 from app.models.responses import OCRResponse, PageResult, DocumentExtractResponse
 from app.services.image_ocr import ImageOCRService
@@ -277,3 +279,105 @@ async def extract_document_from_image(
             processing_time_seconds=round(processing_time, 3),
             error=str(e)
         )
+
+
+@router.post("/pdf-to-image")
+async def convert_pdf_to_image(
+    file: UploadFile = File(...),
+    page: Optional[int] = Query(
+        default=None,
+        description="Page number to convert (1-indexed). If not specified, returns all pages as ZIP."
+    ),
+    scale: float = Query(
+        default=2.0,
+        ge=0.5,
+        le=4.0,
+        description="Scale factor for image resolution (0.5-4.0). Default 2.0 for good quality."
+    ),
+    format: str = Query(
+        default="png",
+        regex="^(png|jpeg)$",
+        description="Output image format: 'png' or 'jpeg'"
+    )
+):
+    """
+    Convert PDF pages to images.
+
+    - **Single page**: Specify `page` parameter to get one image directly
+    - **All pages**: Omit `page` parameter to get a ZIP file with all pages
+
+    Returns PNG or JPEG image(s) based on format parameter.
+    """
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Expected PDF file, got: {file.content_type}"
+        )
+
+    try:
+        pdf_bytes = await file.read()
+        pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        total_pages = len(pdf_doc)
+
+        if total_pages == 0:
+            pdf_doc.close()
+            raise HTTPException(status_code=400, detail="PDF has no pages")
+
+        mat = fitz.Matrix(scale, scale)
+        output_format = format.upper()
+        content_type = f"image/{format}"
+
+        # Single page requested
+        if page is not None:
+            if page < 1 or page > total_pages:
+                pdf_doc.close()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Page {page} out of range. PDF has {total_pages} page(s)."
+                )
+
+            pdf_page = pdf_doc[page - 1]
+            pix = pdf_page.get_pixmap(matrix=mat)
+
+            if output_format == "JPEG":
+                image_bytes = pix.tobytes("jpeg")
+            else:
+                image_bytes = pix.tobytes("png")
+
+            pdf_doc.close()
+
+            filename = f"{file.filename or 'document'}_page_{page}.{format}"
+            return Response(
+                content=image_bytes,
+                media_type=content_type,
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+
+        # All pages - return as ZIP
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for i in range(total_pages):
+                pdf_page = pdf_doc[i]
+                pix = pdf_page.get_pixmap(matrix=mat)
+
+                if output_format == "JPEG":
+                    image_bytes = pix.tobytes("jpeg")
+                else:
+                    image_bytes = pix.tobytes("png")
+
+                zip_file.writestr(f"page_{i + 1}.{format}", image_bytes)
+
+        pdf_doc.close()
+        zip_buffer.seek(0)
+
+        zip_filename = f"{file.filename or 'document'}_images.zip"
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF conversion failed: {str(e)}")
