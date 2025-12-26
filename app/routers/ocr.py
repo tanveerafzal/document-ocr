@@ -296,7 +296,7 @@ async def convert_pdf_to_image(
     ),
     format: str = Query(
         default="png",
-        regex="^(png|jpeg)$",
+        pattern="^(png|jpeg)$",
         description="Output image format: 'png' or 'jpeg'"
     )
 ):
