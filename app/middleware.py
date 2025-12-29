@@ -22,6 +22,7 @@ _worker_started = False
 
 def _db_worker():
     """Background worker that writes logs to database."""
+    logger.info("DB worker thread started")
     while True:
         try:
             log_data = _log_queue.get(timeout=5)
@@ -34,8 +35,9 @@ def _db_worker():
                 db.add(log_entry)
                 db.commit()
                 db.close()
+                logger.info(f"Logged request: {log_data['method']} {log_data['path']} -> {log_data['status_code']}")
             except Exception as e:
-                logger.error(f"Failed to write log to database: {e}")
+                logger.error(f"Failed to write log to database: {e}", exc_info=True)
 
         except Empty:
             continue  # No items in queue, keep waiting
@@ -45,9 +47,11 @@ def _start_worker():
     """Start the background worker thread."""
     global _worker_started
     if not _worker_started:
+        logger.info("Starting DB logging worker thread...")
         thread = threading.Thread(target=_db_worker, daemon=True)
         thread.start()
         _worker_started = True
+        logger.info("DB logging worker thread started")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -144,5 +148,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             "processing_time_ms": round(processing_time_ms, 2)
         }
         _log_queue.put_nowait(log_data)
+        logger.info(f"Queued log: {request.method} {request.url.path} (queue size: {_log_queue.qsize()})")
 
         return response
