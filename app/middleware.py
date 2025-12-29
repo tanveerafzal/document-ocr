@@ -19,7 +19,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, exclude_paths: list[str] = None):
         super().__init__(app)
-        self.exclude_paths = exclude_paths or ["/health", "/docs", "/redoc", "/openapi.json", "/"]
+        self.exclude_paths = exclude_paths or ["/health", "/docs", "/redoc", "/openapi.json"]
+        self.exclude_exact = ["/"]  # Exact match only
         self._db_initialized = False
 
     def _ensure_db(self):
@@ -33,8 +34,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 logger.error(f"Failed to initialize database: {e}")
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip logging for excluded paths
+        # Skip logging for excluded paths (prefix match)
         if any(request.url.path.startswith(p) for p in self.exclude_paths):
+            return await call_next(request)
+
+        # Skip logging for exact match paths
+        if request.url.path in self.exclude_exact:
             return await call_next(request)
 
         # Generate request ID
