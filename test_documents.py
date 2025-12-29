@@ -183,7 +183,7 @@ def main():
     )
     parser.add_argument(
         "--api-url",
-        default=os.environ.get("API_URL", "http://localhost:8080"),
+        default=os.environ.get("API_URL", "https://document-ocr-960587958424.northamerica-northeast2.run.app"),
         help="API base URL (default: http://localhost:8080 or API_URL env var)"
     )
     parser.add_argument(

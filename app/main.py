@@ -1,7 +1,9 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import ocr, health
+from app.middleware import RequestLoggingMiddleware
 
 app = FastAPI(
     title="OCR API",
@@ -18,6 +20,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request logging middleware (only if DATABASE_URL is set)
+if os.environ.get("DATABASE_URL"):
+    app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(health.router)
 app.include_router(ocr.router)
