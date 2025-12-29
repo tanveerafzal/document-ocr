@@ -49,6 +49,7 @@ async def extract_text_from_image(
 
     Supported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP
     """
+    logger.info(f"Received image OCR request: {file.filename}, Content-Type: {file.content_type}")
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=400,

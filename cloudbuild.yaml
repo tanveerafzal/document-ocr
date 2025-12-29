@@ -1,0 +1,43 @@
+steps:
+  # Build app image using pre-built base image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg=BASE_IMAGE=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_BASE_REPO}/${_BASE_IMAGE}:latest'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest'
+      - '.'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+
+substitutions:
+  _REGION: northamerica-northeast2
+  _BASE_REPO: ocr-base
+  _BASE_IMAGE: ocr-base
+  _REPO: cloud-run-source-deploy
+  _IMAGE: document-ocr
+  _SERVICE: document-ocr
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,47 @@
+# Base image with all heavy dependencies pre-installed
+# Build once and push to Artifact Registry
+# Rebuild only when dependencies change
+
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    ghostscript \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    ocrmypdf \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies (heavy ones)
+# Using CPU-only PyTorch for smaller image
+RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch \
+    torchvision \
+    easyocr>=1.7.1
+
+# Pre-download EasyOCR models (English)
+RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False)"
+
+# Install remaining dependencies
+RUN pip install --no-cache-dir \
+    fastapi>=0.109.0 \
+    "uvicorn[standard]>=0.27.0" \
+    python-multipart>=0.0.6 \
+    ocrmypdf>=16.0.0 \
+    Pillow>=10.2.0 \
+    PyMuPDF>=1.23.8 \
+    pydantic>=2.5.3 \
+    anthropic>=0.40.0 \
+    sqlalchemy>=2.0.0 \
+    psycopg2-binary>=2.9.9
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
