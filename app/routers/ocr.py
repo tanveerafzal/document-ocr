@@ -173,7 +173,7 @@ async def extract_document_from_image(
     client_ip = request.client.host if request.client else "unknown"
 
     # Log request
-    logger.info(f"[{request_id}] REQUEST: /ocr/extract/image")
+    logger.info(f"[{request_id}] REQUEST Received: /ocr/extract/image")
     logger.info(f"[{request_id}]   Client IP: {client_ip}")
     logger.info(f"[{request_id}]   Filename: {file.filename}")
     logger.info(f"[{request_id}]   Content-Type: {file.content_type}")
