@@ -11,7 +11,7 @@ Base = declarative_base()
 
 
 class RequestLog(Base):
-    __tablename__ = "requestLogs"
+    __tablename__ = "RequestLogs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     requestId = Column(String(50), unique=True, index=True)

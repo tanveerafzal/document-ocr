@@ -34,14 +34,14 @@ def main():
 
         print(f"✓ Tables in database: {tables}")
 
-        if "requestLogs" in tables:
-            print("✓ requestLogs table exists")
+        if "RequestLogs" in tables:
+            print("✓ RequestLogs table exists")
 
             # Show columns
-            columns = inspector.get_columns("requestLogs")
+            columns = inspector.get_columns("RequestLogs")
             print(f"  Columns: {[col['name'] for col in columns]}")
         else:
-            print("✗ requestLogs table NOT found - something went wrong")
+            print("✗ RequestLogs table NOT found - something went wrong")
 
     except Exception as e:
         print(f"✗ Error: {e}")
