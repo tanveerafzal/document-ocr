@@ -14,27 +14,27 @@ class RequestLog(Base):
     __tablename__ = "requestLogs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    request_id = Column(String(50), unique=True, index=True)
+    requestId = Column(String(50), unique=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     # Request info
     method = Column(String(10))
     path = Column(String(500))
-    query_params = Column(Text, nullable=True)
-    client_ip = Column(String(50))
-    user_agent = Column(String(500), nullable=True)
+    queryParams = Column(Text, nullable=True)
+    clientIp = Column(String(50))
+    userAgent = Column(String(500), nullable=True)
 
     # Request body (for non-file requests)
-    request_content_type = Column(String(100), nullable=True)
-    request_filename = Column(String(255), nullable=True)
-    request_file_size_kb = Column(Float, nullable=True)
+    requestContentType = Column(String(100), nullable=True)
+    requestFilename = Column(String(255), nullable=True)
+    requestFileSizeKb = Column(Float, nullable=True)
 
     # Response info
-    status_code = Column(Integer)
-    response_body = Column(Text, nullable=True)
+    statusCode = Column(Integer)
+    responseBody = Column(Text, nullable=True)
 
     # Timing
-    processing_time_ms = Column(Float)
+    processingTimeMs = Column(Float)
 
 
 def init_db():

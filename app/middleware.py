@@ -1,5 +1,6 @@
 import time
 import logging
+import traceback
 from datetime import datetime
 from typing import Callable
 
@@ -22,16 +23,19 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.exclude_paths = exclude_paths or ["/health", "/docs", "/redoc", "/openapi.json"]
         self.exclude_exact = ["/"]  # Exact match only
         self._db_initialized = False
+        logger.info(f"RequestLoggingMiddleware initialized. Excluded paths: {self.exclude_paths}")
 
     def _ensure_db(self):
         """Ensure database is initialized."""
         if not self._db_initialized:
             try:
+                logger.info("Initializing database connection for request logging...")
                 init_db()
                 self._db_initialized = True
-                logger.info("Database initialized for request logging")
+                logger.info("Database initialized successfully for request logging")
             except Exception as e:
                 logger.error(f"Failed to initialize database: {e}")
+                logger.error(traceback.format_exc())
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip logging for excluded paths (prefix match)
@@ -97,28 +101,51 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # Write log entry to database (synchronous for Cloud Run compatibility)
         self._ensure_db()
+
+        logger.debug(f"Preparing to log request: {request.method} {request.url.path}")
+
+        db = None
         try:
             db = get_db_session()
+            logger.debug("Database session obtained")
+
             log_entry = RequestLog(
-                request_id=request_id,
+                requestId=request_id,
                 timestamp=datetime.utcnow(),
                 method=request.method,
                 path=request.url.path,
-                query_params=query_params,
-                client_ip=client_ip,
-                user_agent=user_agent[:500] if user_agent else None,
-                request_content_type=content_type[:100] if content_type else None,
-                request_filename=request_filename,
-                request_file_size_kb=request_file_size_kb,
-                status_code=response.status_code,
-                response_body=response_body,
-                processing_time_ms=round(processing_time_ms, 2)
+                queryParams=query_params,
+                clientIp=client_ip,
+                userAgent=user_agent[:500] if user_agent else None,
+                requestContentType=content_type[:100] if content_type else None,
+                requestFilename=request_filename,
+                requestFileSizeKb=request_file_size_kb,
+                statusCode=response.status_code,
+                responseBody=response_body,
+                processingTimeMs=round(processing_time_ms, 2)
             )
+            logger.debug(f"Log entry created: request_id={request_id}")
+
             db.add(log_entry)
+            logger.debug("Log entry added to session")
+
             db.commit()
-            db.close()
-            logger.info(f"Logged: {request.method} {request.url.path} -> {response.status_code}")
+            logger.info(f"[DB LOG] {request.method} {request.url.path} -> {response.status_code} ({round(processing_time_ms, 1)}ms)")
+
         except Exception as e:
-            logger.error(f"Failed to log request: {e}")
+            logger.error(f"Failed to log request to database: {e}")
+            logger.error(f"Request details: method={request.method}, path={request.url.path}, status={response.status_code}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            if db:
+                try:
+                    db.rollback()
+                except:
+                    pass
+        finally:
+            if db:
+                try:
+                    db.close()
+                except:
+                    pass
 
         return response
