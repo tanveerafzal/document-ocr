@@ -1,6 +1,7 @@
 import time
 import logging
 import traceback
+import uuid
 from datetime import datetime
 from typing import Callable
 
@@ -110,6 +111,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.debug("Database session obtained")
 
             log_entry = RequestLog(
+                id=str(uuid.uuid4()),
                 requestId=request_id,
                 timestamp=datetime.utcnow(),
                 method=request.method,
