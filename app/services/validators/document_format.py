@@ -18,6 +18,7 @@ class DocumentFormatValidator(BaseValidator):
         ("CA_BC_DL", r"^(DL:?)?\d{6,7}$", "BC Driver's Licence"),
         ("CA_ALBERTA_DL", r"^\d{6}-?\d{3}$", "Alberta Driver's Licence"),
         ("CA_QUEBEC_DL", r"^[A-Z]\d{12}$", "Quebec Driver's Licence"),
+        ("CA_MANITOBA_DL", r"^[A-Z]{4}\d{6}$", "Manitoba Driver's Licence"),
         ("CA_PASSPORT", r"^[A-Z]{2}\d{6}$", "Canadian Passport"),
         # US Documents
         ("US_PASSPORT", r"^[A-Z]\d{8}$", "US Passport"),

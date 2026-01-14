@@ -10,6 +10,15 @@ from app.services.validators.alberta_dl import AlbertaDriversLicenseValidator
 from app.services.validators.quebec_dl import QuebecDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
+from app.services.validators.manitoba_dl import ManitobaDriversLicenseValidator
+from app.services.validators.saskatchewan_dl import SaskatchewanDriversLicenseValidator
+from app.services.validators.nova_scotia_dl import NovaScotiaDriversLicenseValidator
+from app.services.validators.new_brunswick_dl import NewBrunswickDriversLicenseValidator
+from app.services.validators.pei_dl import PEIDriversLicenseValidator
+from app.services.validators.newfoundland_dl import NewfoundlandDriversLicenseValidator
+from app.services.validators.nwt_dl import NWTDriversLicenseValidator
+from app.services.validators.nunavut_dl import NunavutDriversLicenseValidator
+from app.services.validators.yukon_dl import YukonDriversLicenseValidator
 
 __all__ = [
     "BaseValidator",
@@ -24,4 +33,13 @@ __all__ = [
     "QuebecDriversLicenseValidator",
     "CanadianPassportValidator",
     "USDriversLicenseValidator",
+    "ManitobaDriversLicenseValidator",
+    "SaskatchewanDriversLicenseValidator",
+    "NovaScotiaDriversLicenseValidator",
+    "NewBrunswickDriversLicenseValidator",
+    "PEIDriversLicenseValidator",
+    "NewfoundlandDriversLicenseValidator",
+    "NWTDriversLicenseValidator",
+    "NunavutDriversLicenseValidator",
+    "YukonDriversLicenseValidator",
 ]

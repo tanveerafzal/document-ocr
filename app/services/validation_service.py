@@ -20,6 +20,15 @@ from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
 from app.services.validators.bc_dl import BCDriversLicenseValidator
 from app.services.validators.alberta_dl import AlbertaDriversLicenseValidator
 from app.services.validators.quebec_dl import QuebecDriversLicenseValidator
+from app.services.validators.manitoba_dl import ManitobaDriversLicenseValidator
+from app.services.validators.saskatchewan_dl import SaskatchewanDriversLicenseValidator
+from app.services.validators.nova_scotia_dl import NovaScotiaDriversLicenseValidator
+from app.services.validators.new_brunswick_dl import NewBrunswickDriversLicenseValidator
+from app.services.validators.pei_dl import PEIDriversLicenseValidator
+from app.services.validators.newfoundland_dl import NewfoundlandDriversLicenseValidator
+from app.services.validators.nwt_dl import NWTDriversLicenseValidator
+from app.services.validators.nunavut_dl import NunavutDriversLicenseValidator
+from app.services.validators.yukon_dl import YukonDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
 from app.services.document_type_detector import DocumentTypeDetector
@@ -40,6 +49,15 @@ VALIDATOR_DESCRIPTIONS = {
     "bc_drivers_license": "Validating BC DL: 7-digit format, age (16+ for L, 17+ for N), expiry on birthday, validity period",
     "alberta_drivers_license": "Validating Alberta DL: 9-digit format (XXXXXX-XXX), age (14+ for Learner), expiry on birthday",
     "quebec_drivers_license": "Validating Quebec DL: Letter + 12 digits, name match, age (16+), expiry on birthday",
+    "manitoba_drivers_license": "Validating Manitoba DL: 4 letters + 6 digits (ABCD-123-456), name match, age (16+), expiry on birthday",
+    "saskatchewan_drivers_license": "Validating Saskatchewan DL: 8-digit format, age (16+), expiry on birthday",
+    "nova_scotia_drivers_license": "Validating Nova Scotia DL: 5 letters + 9 digits, surname prefix, age (16+), expiry on birthday",
+    "new_brunswick_drivers_license": "Validating New Brunswick DL: 7-digit format, age (16+), expiry on birthday",
+    "pei_drivers_license": "Validating PEI DL: 1-6 digit format, age (16+), expiry on birthday",
+    "newfoundland_drivers_license": "Validating Newfoundland DL: Letter + 9 digits, name match, age (16+), expiry on birthday",
+    "nwt_drivers_license": "Validating NWT DL: 6-digit format, age (15+), expiry on birthday",
+    "nunavut_drivers_license": "Validating Nunavut DL: 6-digit format, age (15+), expiry on birthday",
+    "yukon_drivers_license": "Validating Yukon DL: 6-digit format, age (15+), expiry on birthday",
     "canadian_passport": "Validating Canadian Passport: format (AA123456), validity period (5yr child/10yr adult), age checks",
     "us_drivers_license": "Validating US DL: state-specific format, age requirements, validity period, expiry check",
 }
@@ -74,6 +92,7 @@ class ValidationService:
 
         # Document-type specific validators
         self.document_type_validators: Dict[DocumentType, List[BaseValidator]] = {
+            # Canadian Provinces
             DocumentType.ONTARIO_DRIVERS_LICENSE: [
                 OntarioDriversLicenseValidator(),
             ],
@@ -86,6 +105,35 @@ class ValidationService:
             DocumentType.QUEBEC_DRIVERS_LICENSE: [
                 QuebecDriversLicenseValidator(),
             ],
+            DocumentType.MANITOBA_DRIVERS_LICENSE: [
+                ManitobaDriversLicenseValidator(),
+            ],
+            DocumentType.SASKATCHEWAN_DRIVERS_LICENSE: [
+                SaskatchewanDriversLicenseValidator(),
+            ],
+            DocumentType.NOVA_SCOTIA_DRIVERS_LICENSE: [
+                NovaScotiaDriversLicenseValidator(),
+            ],
+            DocumentType.NEW_BRUNSWICK_DRIVERS_LICENSE: [
+                NewBrunswickDriversLicenseValidator(),
+            ],
+            DocumentType.PEI_DRIVERS_LICENSE: [
+                PEIDriversLicenseValidator(),
+            ],
+            DocumentType.NEWFOUNDLAND_DRIVERS_LICENSE: [
+                NewfoundlandDriversLicenseValidator(),
+            ],
+            # Canadian Territories
+            DocumentType.NWT_DRIVERS_LICENSE: [
+                NWTDriversLicenseValidator(),
+            ],
+            DocumentType.NUNAVUT_DRIVERS_LICENSE: [
+                NunavutDriversLicenseValidator(),
+            ],
+            DocumentType.YUKON_DRIVERS_LICENSE: [
+                YukonDriversLicenseValidator(),
+            ],
+            # Other Documents
             DocumentType.CANADIAN_PASSPORT: [
                 CanadianPassportValidator(),
             ],
