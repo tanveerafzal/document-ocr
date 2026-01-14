@@ -6,13 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import ocr, health
 from app.middleware import RequestLoggingMiddleware
+from app.config import BUILD_NUMBER
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Build number from environment variable
-BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "dev")
 
 
 @asynccontextmanager

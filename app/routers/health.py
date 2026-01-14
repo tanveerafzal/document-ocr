@@ -1,13 +1,11 @@
-import os
 from fastapi import APIRouter
 
 from app.models.responses import HealthResponse
 from app.services.image_ocr import ImageOCRService
 from app.services.pdf_ocr import PDFOCRService
+from app.config import BUILD_NUMBER
 
 router = APIRouter(tags=["health"])
-
-BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "dev")
 
 
 @router.get("/health", response_model=HealthResponse)
