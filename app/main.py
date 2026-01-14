@@ -1,5 +1,6 @@
 import os
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,12 +11,30 @@ from app.middleware import RequestLoggingMiddleware
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Build number from environment variable
+BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "dev")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("#" * 80)
+    logger.info(f"#################### BUILD NUMBER: {BUILD_NUMBER} ####################")
+    logger.info("#" * 80)
+    logger.info(f"OCR API Service starting...")
+    logger.info(f"Build: {BUILD_NUMBER}")
+    yield
+    # Shutdown
+    logger.info(f"OCR API Service shutting down (build: {BUILD_NUMBER})")
+
+
 app = FastAPI(
     title="OCR API",
     description="Extract text from images and PDFs using EasyOCR and OCRmyPDF",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -41,6 +60,7 @@ app.include_router(ocr.router)
 async def root():
     return {
         "message": "OCR API Service",
+        "build": BUILD_NUMBER,
         "docs": "/docs",
         "health": "/health"
     }

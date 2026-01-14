@@ -265,10 +265,11 @@ async def extract_document_from_image(
         validation_summary = None
         validation_results = None
         if validate:
-            logger.info(f"[{request_id}]   Running parallel validation checks...")
             validation_service = ValidationService(minimum_age=minimum_age)
-            validation_summary, validation_results = await validation_service.validate_document(extracted_fields)
-            logger.info(f"[{request_id}]   Validation complete: {validation_summary.overall_status.value}")
+            validation_summary, validation_results = await validation_service.validate_document(
+                extracted_fields,
+                request_id=request_id
+            )
 
         processing_time = time.time() - start_time
 
@@ -319,8 +320,6 @@ async def extract_document_from_image(
         logger.info(f"[{request_id}]   Processing time: {response.processing_time_seconds}s")
         if not is_valid:
             logger.info(f"[{request_id}]   Missing fields: {missing_fields}")
-        if validate:
-            logger.info(f"[{request_id}]   Validation score: {validation_summary.validation_score}")
 
         return response
 

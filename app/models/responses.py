@@ -36,6 +36,7 @@ class OCRResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+    build: str
     easyocr_available: bool
     tesseract_available: bool
 

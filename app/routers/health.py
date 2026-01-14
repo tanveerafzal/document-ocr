@@ -7,12 +7,15 @@ from app.services.pdf_ocr import PDFOCRService
 
 router = APIRouter(tags=["health"])
 
+BUILD_NUMBER = os.environ.get("BUILD_NUMBER", "dev")
+
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Check the health status of the OCR service."""
     return HealthResponse(
         status="healthy",
+        build=BUILD_NUMBER,
         easyocr_available=ImageOCRService.is_available(),
         tesseract_available=PDFOCRService.is_available()
     )

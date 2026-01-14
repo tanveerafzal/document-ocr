@@ -42,17 +42,26 @@ class ValidationService:
 
     async def validate_document(
         self,
-        document_data: Dict[str, Any]
+        document_data: Dict[str, Any],
+        request_id: str = ""
     ) -> Tuple[ValidationSummary, List[ValidatorResult]]:
         """
         Run all validators in parallel on document data.
 
         Args:
             document_data: Dictionary with extracted document fields
+            request_id: Optional request ID for logging correlation
 
         Returns:
             Tuple of (ValidationSummary, List[ValidatorResult])
         """
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        # Log validation start
+        validator_names = [v.name for v in self.validators]
+        logger.info(f"{log_prefix}VALIDATION Starting parallel validation with {len(self.validators)} validators")
+        logger.info(f"{log_prefix}VALIDATION Validators: {', '.join(validator_names)}")
+
         # Run all validators in parallel using asyncio.gather
         validation_tasks = [
             validator.validate(document_data)
@@ -64,24 +73,50 @@ class ValidationService:
             return_exceptions=True
         )
 
-        # Handle any exceptions that occurred
+        # Handle any exceptions that occurred and log each result
         processed_results: List[ValidatorResult] = []
         for i, result in enumerate(results):
+            validator_name = self.validators[i].name
             if isinstance(result, Exception):
+                logger.error(f"{log_prefix}VALIDATION [{validator_name}] ERROR: {str(result)}")
                 processed_results.append(ValidatorResult(
-                    validator_name=self.validators[i].name,
+                    validator_name=validator_name,
                     status=ValidationStatus.FAILED,
                     message=f"Validator error: {str(result)}",
                     details={"error_type": type(result).__name__},
                     execution_time_ms=0
                 ))
             else:
+                # Log each validator result
+                status_icon = self._get_status_icon(result.status)
+                logger.info(
+                    f"{log_prefix}VALIDATION [{validator_name}] {status_icon} {result.status.value.upper()}: "
+                    f"{result.message} ({result.execution_time_ms:.2f}ms)"
+                )
                 processed_results.append(result)
 
         # Calculate summary
         summary = self._create_summary(processed_results)
 
+        # Log summary
+        logger.info(f"{log_prefix}VALIDATION Summary: {summary.overall_status.value.upper()} "
+                   f"(score: {summary.validation_score}, "
+                   f"passed: {summary.passed_checks}, "
+                   f"failed: {summary.failed_checks}, "
+                   f"warnings: {summary.warning_checks}, "
+                   f"skipped: {summary.skipped_checks})")
+
         return summary, processed_results
+
+    def _get_status_icon(self, status: ValidationStatus) -> str:
+        """Get a status indicator for logging."""
+        icons = {
+            ValidationStatus.PASSED: "[PASS]",
+            ValidationStatus.FAILED: "[FAIL]",
+            ValidationStatus.WARNING: "[WARN]",
+            ValidationStatus.SKIPPED: "[SKIP]",
+        }
+        return icons.get(status, "[????]")
 
     def _create_summary(
         self,
