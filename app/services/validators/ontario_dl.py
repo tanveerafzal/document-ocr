@@ -14,12 +14,44 @@ class OntarioDriversLicenseValidator(BaseValidator):
     - License number format: Letter + 4 digits + hyphen + 5 digits + hyphen + 5 digits
       Example: A1234-12345-12345
     - First letter corresponds to first letter of last name
+    - Name format on license: "LASTNAME, FIRSTNAME"
     - License classes: G1, G2, G, M1, M2, M, etc.
     - Expiry is typically on the holder's birthday
+    - Last 6 digits encode DOB in YYMMDD format
     - Minimum age for G1: 16, G2: 17 (after 12 months), G: 18 (after 12 months)
     """
 
     name = "ontario_drivers_license"
+
+    def _extract_last_name(self, document_data: Dict[str, Any]) -> tuple[str, str]:
+        """
+        Extract last name from document data.
+
+        Ontario DL uses "LASTNAME, FIRSTNAME" format.
+        Returns tuple of (last_name, source) where source indicates where it came from.
+        """
+        # First try the dedicated last_name field
+        last_name = document_data.get("last_name", "") or ""
+        if last_name:
+            return last_name.strip(), "last_name_field"
+
+        # Try to extract from full_name in "LASTNAME, FIRSTNAME" format
+        full_name = document_data.get("full_name", "") or ""
+        if full_name and "," in full_name:
+            # Format: "LASTNAME, FIRSTNAME" or "LASTNAME, FIRSTNAME MIDDLENAME"
+            parts = full_name.split(",", 1)
+            last_name = parts[0].strip()
+            if last_name:
+                return last_name, "full_name_parsed"
+
+        # Try full_name without comma (assume "FIRSTNAME LASTNAME" format)
+        if full_name:
+            parts = full_name.strip().split()
+            if len(parts) >= 2:
+                # Assume last word is last name
+                return parts[-1].strip(), "full_name_last_word"
+
+        return "", "not_found"
 
     async def validate(self, document_data: Dict[str, Any]) -> ValidatorResult:
         start_time = time.perf_counter()
@@ -29,7 +61,10 @@ class OntarioDriversLicenseValidator(BaseValidator):
         details = {"checks_performed": []}
 
         document_number = document_data.get("document_number", "") or ""
-        last_name = document_data.get("last_name", "") or ""
+        last_name, name_source = self._extract_last_name(document_data)
+        details["last_name_source"] = name_source
+        if last_name:
+            details["extracted_last_name"] = last_name
         date_of_birth = document_data.get("date_of_birth")
         expiry_date = document_data.get("expiry_date")
 
@@ -50,18 +85,28 @@ class OntarioDriversLicenseValidator(BaseValidator):
         else:
             details["license_number_valid"] = True
 
-        # Check 2: First letter matches last name
+        # Check 2: First letter of license number matches last name initial
         details["checks_performed"].append("first_letter_match")
-        if clean_number and last_name:
+        if clean_number:
             license_letter = clean_number[0].upper()
-            last_name_letter = last_name[0].upper()
-            if license_letter != last_name_letter:
-                issues.append(
-                    f"License first letter '{license_letter}' does not match "
-                    f"last name initial '{last_name_letter}'"
-                )
+            details["license_first_letter"] = license_letter
+
+            if last_name:
+                last_name_letter = last_name[0].upper()
+                details["last_name_initial"] = last_name_letter
+
+                if license_letter != last_name_letter:
+                    issues.append(
+                        f"License first letter '{license_letter}' does not match "
+                        f"last name initial '{last_name_letter}' (from {name_source})"
+                    )
+                else:
+                    details["first_letter_matches"] = True
             else:
-                details["first_letter_matches"] = True
+                warnings.append(
+                    f"Cannot verify license letter '{license_letter}' - no last name found. "
+                    "Ontario DL format: 'LASTNAME, FIRSTNAME'"
+                )
 
         # Check 3: Minimum age for Ontario DL (16 for G1)
         details["checks_performed"].append("minimum_age_ontario")
