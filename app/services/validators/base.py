@@ -59,15 +59,40 @@ class BaseValidator(ABC):
             return None
 
         formats = [
+            # ISO and common formats
             "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y",
             "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y",
+            # With month names (full and abbreviated)
+            "%Y-%b-%d", "%Y-%B-%d",  # 2027-Aug-07, 2027-August-07
+            "%d-%b-%Y", "%d-%B-%Y",  # 07-Aug-2027, 07-August-2027
+            "%b-%d-%Y", "%B-%d-%Y",  # Aug-07-2027, August-07-2027
             "%B %d, %Y", "%d %B %Y", "%b %d, %Y",
-            "%d %b %Y", "%Y%m%d"
+            "%d %b %Y", "%b %d %Y", "%B %d %Y",
+            # Compact format
+            "%Y%m%d",
+            # Slash with month names
+            "%Y/%b/%d", "%d/%b/%Y",
+            "%Y/%B/%d", "%d/%B/%Y",
         ]
+
+        # Normalize the date string (handle case variations)
+        normalized = date_str.strip()
 
         for fmt in formats:
             try:
-                return datetime.strptime(date_str.strip(), fmt)
+                return datetime.strptime(normalized, fmt)
             except ValueError:
                 continue
+
+        # Try with title case for month names
+        try:
+            normalized_title = normalized.title()
+            for fmt in formats:
+                try:
+                    return datetime.strptime(normalized_title, fmt)
+                except ValueError:
+                    continue
+        except:
+            pass
+
         return None

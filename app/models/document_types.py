@@ -38,7 +38,7 @@ DOCUMENT_PATTERNS = {
         "name": "BC Driver's Licence",
         "country": "Canada",
         "state_province": "British Columbia",
-        "license_format": r"^\d{7}$",
+        "license_format": r"^(DL:?)?\d{6,7}$",
         "keywords": ["british columbia", "bc", "driver's licence", "driver licence", "class 5", "class 7"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },

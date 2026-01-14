@@ -11,9 +11,9 @@ class BCDriversLicenseValidator(BaseValidator):
     Validate British Columbia Driver's Licence specific requirements.
 
     BC DL specifics:
-    - Licence number format: 7 digits (e.g., 1234567)
-    - No letter prefix (unlike Ontario)
-    - Name format on licence: "LASTNAME, FIRSTNAME MIDDLENAME"
+    - Licence number format: "DL:" prefix + 6 digits (e.g., DL:423768)
+    - May also appear as just 6-7 digits without prefix
+    - Name format on licence: "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME"
     - Licence classes: Class 7L (Learner), Class 7 (Novice/N), Class 5 (Full)
     - Minimum age: 16 for Class 7L, must hold 7L for 12 months before Class 7
     - Expiry is typically on the holder's birthday
@@ -67,30 +67,46 @@ class BCDriversLicenseValidator(BaseValidator):
         expiry_date = document_data.get("expiry_date")
         issue_date_str = document_data.get("issue_date")
 
-        # Check 1: Licence number format (7 digits)
+        # Check 1: Licence number format (DL:XXXXXX or 6-7 digits)
         details["checks_performed"].append("licence_number_format")
-        clean_number = re.sub(r"[\s\-]", "", document_number).strip()
+        raw_number = document_number.strip().upper()
 
-        bc_format = r"^\d{7}$"
+        # Remove "DL:" prefix if present
+        if raw_number.startswith("DL:"):
+            clean_number = raw_number[3:].strip()
+            details["has_dl_prefix"] = True
+        elif raw_number.startswith("DL"):
+            clean_number = raw_number[2:].strip()
+            details["has_dl_prefix"] = True
+        else:
+            clean_number = re.sub(r"[\s\-]", "", raw_number)
+            details["has_dl_prefix"] = False
+
+        # BC format: 6 digits (with DL: prefix) or 7 digits (without)
+        bc_format_6 = r"^\d{6}$"
+        bc_format_7 = r"^\d{7}$"
 
         if not clean_number:
             issues.append("Missing licence number")
-        elif not re.match(bc_format, clean_number):
-            # Check if it might be valid with minor issues
-            if clean_number.isdigit() and len(clean_number) == 7:
-                details["licence_number_valid"] = True
-            elif clean_number.isdigit() and 6 <= len(clean_number) <= 8:
-                warnings.append(
-                    f"Licence number '{document_number}' has {len(clean_number)} digits. "
-                    "BC licence should have exactly 7 digits."
-                )
-            else:
-                issues.append(
-                    f"Invalid BC licence format. Expected: 7 digits (e.g., 1234567), "
-                    f"Got: {document_number}"
-                )
-        else:
+        elif re.match(bc_format_6, clean_number):
             details["licence_number_valid"] = True
+            details["licence_digits"] = 6
+        elif re.match(bc_format_7, clean_number):
+            details["licence_number_valid"] = True
+            details["licence_digits"] = 7
+        elif clean_number.isdigit() and 5 <= len(clean_number) <= 8:
+            warnings.append(
+                f"Licence number '{document_number}' has {len(clean_number)} digits. "
+                "BC licence typically has 6 digits (DL:XXXXXX) or 7 digits."
+            )
+            details["licence_digits"] = len(clean_number)
+        else:
+            issues.append(
+                f"Invalid BC licence format. Expected: DL:XXXXXX (6 digits) or 7 digits, "
+                f"Got: {document_number}"
+            )
+
+        details["clean_licence_number"] = clean_number
 
         # Check 2: Minimum age for BC DL (16 for Class 7L Learner)
         details["checks_performed"].append("minimum_age_bc")
