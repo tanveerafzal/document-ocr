@@ -10,15 +10,22 @@ REQUIRED_FIELDS = ["first_name", "last_name", "document_number", "date_of_birth"
 VISION_PROMPT = """Analyze this identity document image and extract the following fields.
 
 Return a JSON object with these exact fields:
-- first_name: The person's first name
-- last_name: The person's last name
-- full_name: The complete name as shown on the document
+- first_name: The person's first/given name
+- last_name: The person's last name/surname/family name
+- full_name: The complete name EXACTLY as shown on the document (preserve original format)
 - document_number: The ID/document/license number
-- date_of_birth: Date of birth (format as shown in document)
-- issue_date: Document issue date (format as shown in document)
-- expiry_date: Document expiry date (format as shown in document)
+- date_of_birth: Date of birth (format as YYYY-MM-DD)
+- issue_date: Document issue date (format as YYYY-MM-DD)
+- expiry_date: Document expiry date (format as YYYY-MM-DD)
 - gender: Gender (M, F, or as shown)
 - address: Full address if present
+
+IMPORTANT for Canadian documents (especially Ontario Driver's Licence):
+- Name format on Ontario DL is "LASTNAME, FIRSTNAME" (e.g., "SMITH, JOHN")
+- The first letter of the driver's licence number corresponds to the LAST NAME
+- Extract last_name from the part BEFORE the comma
+- Extract first_name from the part AFTER the comma
+- Example: If document shows "SMITH, JOHN" then last_name="SMITH", first_name="JOHN"
 
 If a field cannot be found or is not visible, use null for that field.
 Return ONLY the JSON object, no additional text or markdown formatting."""

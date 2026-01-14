@@ -27,15 +27,13 @@ class OntarioDriversLicenseValidator(BaseValidator):
         """
         Extract last name from document data.
 
-        Ontario DL uses "LASTNAME, FIRSTNAME" format.
+        Ontario DL uses "LASTNAME, FIRSTNAME" format - this is the authoritative source.
+        The first letter of the license number MUST match the last name.
+
         Returns tuple of (last_name, source) where source indicates where it came from.
         """
-        # First try the dedicated last_name field
-        last_name = document_data.get("last_name", "") or ""
-        if last_name:
-            return last_name.strip(), "last_name_field"
-
-        # Try to extract from full_name in "LASTNAME, FIRSTNAME" format
+        # For Ontario DL, prioritize full_name in "LASTNAME, FIRSTNAME" format
+        # This is the authoritative format shown on the physical card
         full_name = document_data.get("full_name", "") or ""
         if full_name and "," in full_name:
             # Format: "LASTNAME, FIRSTNAME" or "LASTNAME, FIRSTNAME MIDDLENAME"
@@ -43,6 +41,11 @@ class OntarioDriversLicenseValidator(BaseValidator):
             last_name = parts[0].strip()
             if last_name:
                 return last_name, "full_name_parsed"
+
+        # Fall back to dedicated last_name field
+        last_name = document_data.get("last_name", "") or ""
+        if last_name:
+            return last_name.strip(), "last_name_field"
 
         # Try full_name without comma (assume "FIRSTNAME LASTNAME" format)
         if full_name:

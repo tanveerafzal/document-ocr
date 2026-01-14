@@ -18,6 +18,7 @@ from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
 from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
+from app.services.validators.us_drivers_license import USDriversLicenseValidator
 from app.services.document_type_detector import DocumentTypeDetector
 
 # Configure logging for this module
@@ -34,6 +35,7 @@ VALIDATOR_DESCRIPTIONS = {
     "face_matching": "Checking face match between document and selfie",
     "ontario_drivers_license": "Validating Ontario DL: format, name match, age, expiry on birthday, DOB in last 6 digits",
     "canadian_passport": "Validating Canadian Passport: format (AA123456), validity period (5yr child/10yr adult), age checks",
+    "us_drivers_license": "Validating US DL: state-specific format, age requirements, validity period, expiry check",
 }
 
 
@@ -71,6 +73,9 @@ class ValidationService:
             ],
             DocumentType.CANADIAN_PASSPORT: [
                 CanadianPassportValidator(),
+            ],
+            DocumentType.US_DRIVERS_LICENSE: [
+                USDriversLicenseValidator(),
             ],
         }
 
