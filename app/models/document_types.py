@@ -7,6 +7,8 @@ class DocumentType(str, Enum):
     """Supported document types for validation."""
     ONTARIO_DRIVERS_LICENSE = "ontario_drivers_license"
     BC_DRIVERS_LICENSE = "bc_drivers_license"
+    ALBERTA_DRIVERS_LICENSE = "alberta_drivers_license"
+    QUEBEC_DRIVERS_LICENSE = "quebec_drivers_license"
     CANADIAN_PASSPORT = "canadian_passport"
     US_DRIVERS_LICENSE = "us_drivers_license"
     US_PASSPORT = "us_passport"
@@ -40,6 +42,22 @@ DOCUMENT_PATTERNS = {
         "state_province": "British Columbia",
         "license_format": r"^(DL:?)?\d{6,7}$",
         "keywords": ["british columbia", "bc", "driver's licence", "driver licence", "class 5", "class 7"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.ALBERTA_DRIVERS_LICENSE: {
+        "name": "Alberta Driver's Licence",
+        "country": "Canada",
+        "state_province": "Alberta",
+        "license_format": r"^\d{6}-?\d{3}$",
+        "keywords": ["alberta", "ab", "driver's licence", "driver licence", "class 5", "class 7", "gdl"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.QUEBEC_DRIVERS_LICENSE: {
+        "name": "Quebec Driver's Licence",
+        "country": "Canada",
+        "state_province": "Quebec",
+        "license_format": r"^[A-Z]\d{4}-?\d{6}-?\d{2}$",
+        "keywords": ["quebec", "qc", "permis de conduire", "driver's licence", "classe 5", "probatoire"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.CANADIAN_PASSPORT: {

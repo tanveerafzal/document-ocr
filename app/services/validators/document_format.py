@@ -13,13 +13,26 @@ class DocumentFormatValidator(BaseValidator):
     # Known document number patterns by type/country
     PATTERNS: List[Tuple[str, str, str]] = [
         # (name, pattern, description)
+        # Canadian Documents
+        ("CA_ONTARIO_DL", r"^[A-Z]\d{4}-?\d{5}-?\d{5}$", "Ontario Driver's Licence"),
+        ("CA_BC_DL", r"^(DL:?)?\d{6,7}$", "BC Driver's Licence"),
+        ("CA_ALBERTA_DL", r"^\d{6}-?\d{3}$", "Alberta Driver's Licence"),
+        ("CA_QUEBEC_DL", r"^[A-Z]\d{12}$", "Quebec Driver's Licence"),
+        ("CA_PASSPORT", r"^[A-Z]{2}\d{6}$", "Canadian Passport"),
+        # US Documents
         ("US_PASSPORT", r"^[A-Z]\d{8}$", "US Passport"),
-        ("US_DRIVERS_LICENSE", r"^[A-Z]{1,2}\d{6,8}$", "US Driver's License"),
-        ("CA_DRIVERS_LICENSE", r"^[A-Z]\d{4}-\d{5}-\d{5}$", "Canadian Driver's License"),
+        ("US_DL_CALIFORNIA", r"^[A-Z]\d{7}$", "California Driver's License"),
+        ("US_DL_TEXAS", r"^\d{8}$", "Texas Driver's License"),
+        ("US_DL_FLORIDA", r"^[A-Z]\d{12}$", "Florida Driver's License"),
+        ("US_DL_NEW_YORK", r"^\d{9}$", "New York Driver's License"),
+        ("US_DL_OHIO", r"^[A-Z]{2}\d{6}$", "Ohio Driver's License"),
+        ("US_DRIVERS_LICENSE", r"^[A-Z]{1,2}\d{6,14}$", "US Driver's License (generic)"),
+        # UK/EU Documents
         ("UK_PASSPORT", r"^\d{9}$", "UK Passport"),
         ("UK_DRIVERS_LICENSE", r"^[A-Z]{5}\d{6}[A-Z]{2}\d{2}$", "UK Driver's License"),
         ("EU_ID", r"^[A-Z]{2}\d{7}$", "European ID Card"),
-        ("GENERIC_NUMERIC", r"^\d{8,12}$", "Generic numeric ID"),
+        # Generic patterns (should be last as fallback)
+        ("GENERIC_NUMERIC", r"^\d{6,12}$", "Generic numeric ID"),
         ("GENERIC_ALPHANUMERIC", r"^[A-Z0-9]{6,15}$", "Generic alphanumeric ID"),
     ]
 

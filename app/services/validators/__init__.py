@@ -6,6 +6,8 @@ from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
 from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
 from app.services.validators.bc_dl import BCDriversLicenseValidator
+from app.services.validators.alberta_dl import AlbertaDriversLicenseValidator
+from app.services.validators.quebec_dl import QuebecDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
 
@@ -18,6 +20,8 @@ __all__ = [
     "FaceMatchingValidator",
     "OntarioDriversLicenseValidator",
     "BCDriversLicenseValidator",
+    "AlbertaDriversLicenseValidator",
+    "QuebecDriversLicenseValidator",
     "CanadianPassportValidator",
     "USDriversLicenseValidator",
 ]

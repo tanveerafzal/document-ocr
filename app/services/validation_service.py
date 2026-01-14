@@ -18,6 +18,8 @@ from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
 from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
 from app.services.validators.bc_dl import BCDriversLicenseValidator
+from app.services.validators.alberta_dl import AlbertaDriversLicenseValidator
+from app.services.validators.quebec_dl import QuebecDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
 from app.services.document_type_detector import DocumentTypeDetector
@@ -36,6 +38,8 @@ VALIDATOR_DESCRIPTIONS = {
     "face_matching": "Checking face match between document and selfie",
     "ontario_drivers_license": "Validating Ontario DL: format, name match, age, expiry on birthday, DOB in last 6 digits",
     "bc_drivers_license": "Validating BC DL: 7-digit format, age (16+ for L, 17+ for N), expiry on birthday, validity period",
+    "alberta_drivers_license": "Validating Alberta DL: 9-digit format (XXXXXX-XXX), age (14+ for Learner), expiry on birthday",
+    "quebec_drivers_license": "Validating Quebec DL: Letter + 12 digits, name match, age (16+), expiry on birthday",
     "canadian_passport": "Validating Canadian Passport: format (AA123456), validity period (5yr child/10yr adult), age checks",
     "us_drivers_license": "Validating US DL: state-specific format, age requirements, validity period, expiry check",
 }
@@ -75,6 +79,12 @@ class ValidationService:
             ],
             DocumentType.BC_DRIVERS_LICENSE: [
                 BCDriversLicenseValidator(),
+            ],
+            DocumentType.ALBERTA_DRIVERS_LICENSE: [
+                AlbertaDriversLicenseValidator(),
+            ],
+            DocumentType.QUEBEC_DRIVERS_LICENSE: [
+                QuebecDriversLicenseValidator(),
             ],
             DocumentType.CANADIAN_PASSPORT: [
                 CanadianPassportValidator(),
