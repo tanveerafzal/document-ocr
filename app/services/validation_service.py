@@ -14,7 +14,19 @@ from app.services.validators.age_validator import AgeValidator
 from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
 
+# Configure logging for this module
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Validator descriptions for logging
+VALIDATOR_DESCRIPTIONS = {
+    "data_consistency": "Checking date relationships (DOB < Issue Date < Expiry Date)",
+    "document_expiry": "Checking if document is expired",
+    "age_validation": "Checking if person meets minimum age requirement",
+    "document_format": "Checking if document number matches known formats",
+    "face_matching": "Checking face match between document and selfie",
+}
 
 
 class ValidationService:
@@ -55,12 +67,17 @@ class ValidationService:
         Returns:
             Tuple of (ValidationSummary, List[ValidatorResult])
         """
-        log_prefix = f"[{request_id}] " if request_id else ""
+        log_prefix = f"[{request_id}]" if request_id else ""
 
-        # Log validation start
-        validator_names = [v.name for v in self.validators]
-        logger.info(f"{log_prefix}VALIDATION Starting parallel validation with {len(self.validators)} validators")
-        logger.info(f"{log_prefix}VALIDATION Validators: {', '.join(validator_names)}")
+        # Log validation start with clear banner
+        print(f"{log_prefix} ========== DOCUMENT VALIDATION STARTED ==========")
+        logger.info(f"{log_prefix} ========== DOCUMENT VALIDATION STARTED ==========")
+        logger.info(f"{log_prefix} Running {len(self.validators)} validation checks in parallel:")
+
+        # Log what each validator will check
+        for validator in self.validators:
+            description = VALIDATOR_DESCRIPTIONS.get(validator.name, "Unknown check")
+            logger.info(f"{log_prefix}   -> {validator.name}: {description}")
 
         # Run all validators in parallel using asyncio.gather
         validation_tasks = [
@@ -73,12 +90,20 @@ class ValidationService:
             return_exceptions=True
         )
 
+        # Log results header
+        logger.info(f"{log_prefix} ---------- VALIDATION RESULTS ----------")
+        print(f"{log_prefix} ---------- VALIDATION RESULTS ----------")
+
         # Handle any exceptions that occurred and log each result
         processed_results: List[ValidatorResult] = []
         for i, result in enumerate(results):
             validator_name = self.validators[i].name
+            description = VALIDATOR_DESCRIPTIONS.get(validator_name, "")
+
             if isinstance(result, Exception):
-                logger.error(f"{log_prefix}VALIDATION [{validator_name}] ERROR: {str(result)}")
+                log_msg = f"{log_prefix}   [FAIL] {validator_name}: ERROR - {str(result)}"
+                logger.error(log_msg)
+                print(log_msg)
                 processed_results.append(ValidatorResult(
                     validator_name=validator_name,
                     status=ValidationStatus.FAILED,
@@ -87,24 +112,32 @@ class ValidationService:
                     execution_time_ms=0
                 ))
             else:
-                # Log each validator result
+                # Log each validator result with clear status
                 status_icon = self._get_status_icon(result.status)
-                logger.info(
-                    f"{log_prefix}VALIDATION [{validator_name}] {status_icon} {result.status.value.upper()}: "
+                log_msg = (
+                    f"{log_prefix}   {status_icon} {validator_name}: "
                     f"{result.message} ({result.execution_time_ms:.2f}ms)"
                 )
+                logger.info(log_msg)
+                print(log_msg)
                 processed_results.append(result)
 
         # Calculate summary
         summary = self._create_summary(processed_results)
 
-        # Log summary
-        logger.info(f"{log_prefix}VALIDATION Summary: {summary.overall_status.value.upper()} "
-                   f"(score: {summary.validation_score}, "
-                   f"passed: {summary.passed_checks}, "
-                   f"failed: {summary.failed_checks}, "
-                   f"warnings: {summary.warning_checks}, "
-                   f"skipped: {summary.skipped_checks})")
+        # Log summary with clear banner
+        summary_msg = (
+            f"{log_prefix} ========== VALIDATION COMPLETE ==========\n"
+            f"{log_prefix}   Overall Status: {summary.overall_status.value.upper()}\n"
+            f"{log_prefix}   Validation Score: {summary.validation_score}\n"
+            f"{log_prefix}   Passed: {summary.passed_checks} | "
+            f"Failed: {summary.failed_checks} | "
+            f"Warnings: {summary.warning_checks} | "
+            f"Skipped: {summary.skipped_checks}\n"
+            f"{log_prefix} ==========================================="
+        )
+        logger.info(summary_msg)
+        print(summary_msg)
 
         return summary, processed_results
 
