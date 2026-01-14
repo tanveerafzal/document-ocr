@@ -20,12 +20,15 @@ Return a JSON object with these exact fields:
 - gender: Gender (M, F, or as shown)
 - address: Full address if present
 
-IMPORTANT for Canadian documents (especially Ontario Driver's Licence):
-- Name format on Ontario DL is "LASTNAME, FIRSTNAME" (e.g., "SMITH, JOHN")
-- The first letter of the driver's licence number corresponds to the LAST NAME
-- Extract last_name from the part BEFORE the comma
-- Extract first_name from the part AFTER the comma
-- Example: If document shows "SMITH, JOHN" then last_name="SMITH", first_name="JOHN"
+IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
+- Name format is "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME" (LAST NAME comes FIRST!)
+- The FIRST word/part is the LAST NAME (surname/family name)
+- The SECOND word/part is the FIRST NAME (given name)
+- The first letter of Ontario driver's licence number corresponds to the LAST NAME
+- Examples:
+  - "SMITH JOHN" -> last_name="SMITH", first_name="JOHN"
+  - "SMITH, JOHN" -> last_name="SMITH", first_name="JOHN"
+  - "NADEEM ASIF" -> last_name="NADEEM", first_name="ASIF"
 
 If a field cannot be found or is not visible, use null for that field.
 Return ONLY the JSON object, no additional text or markdown formatting."""

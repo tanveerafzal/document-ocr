@@ -17,6 +17,7 @@ from app.services.validators.age_validator import AgeValidator
 from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
 from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
+from app.services.validators.bc_dl import BCDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
 from app.services.document_type_detector import DocumentTypeDetector
@@ -34,6 +35,7 @@ VALIDATOR_DESCRIPTIONS = {
     "document_format": "Checking if document number matches known formats",
     "face_matching": "Checking face match between document and selfie",
     "ontario_drivers_license": "Validating Ontario DL: format, name match, age, expiry on birthday, DOB in last 6 digits",
+    "bc_drivers_license": "Validating BC DL: 7-digit format, age (16+ for L, 17+ for N), expiry on birthday, validity period",
     "canadian_passport": "Validating Canadian Passport: format (AA123456), validity period (5yr child/10yr adult), age checks",
     "us_drivers_license": "Validating US DL: state-specific format, age requirements, validity period, expiry check",
 }
@@ -70,6 +72,9 @@ class ValidationService:
         self.document_type_validators: Dict[DocumentType, List[BaseValidator]] = {
             DocumentType.ONTARIO_DRIVERS_LICENSE: [
                 OntarioDriversLicenseValidator(),
+            ],
+            DocumentType.BC_DRIVERS_LICENSE: [
+                BCDriversLicenseValidator(),
             ],
             DocumentType.CANADIAN_PASSPORT: [
                 CanadianPassportValidator(),

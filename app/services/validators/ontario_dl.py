@@ -27,32 +27,32 @@ class OntarioDriversLicenseValidator(BaseValidator):
         """
         Extract last name from document data.
 
-        Ontario DL uses "LASTNAME, FIRSTNAME" format - this is the authoritative source.
+        Ontario DL uses "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME" format.
+        The FIRST word is always the LAST NAME on Ontario DL.
         The first letter of the license number MUST match the last name.
 
         Returns tuple of (last_name, source) where source indicates where it came from.
         """
-        # For Ontario DL, prioritize full_name in "LASTNAME, FIRSTNAME" format
-        # This is the authoritative format shown on the physical card
+        # For Ontario DL, prioritize full_name since it shows the authoritative format
         full_name = document_data.get("full_name", "") or ""
-        if full_name and "," in full_name:
-            # Format: "LASTNAME, FIRSTNAME" or "LASTNAME, FIRSTNAME MIDDLENAME"
-            parts = full_name.split(",", 1)
-            last_name = parts[0].strip()
-            if last_name:
-                return last_name, "full_name_parsed"
+
+        if full_name:
+            # Check for comma format: "LASTNAME, FIRSTNAME"
+            if "," in full_name:
+                parts = full_name.split(",", 1)
+                last_name = parts[0].strip()
+                if last_name:
+                    return last_name, "full_name_comma_format"
+            else:
+                # No comma: "LASTNAME FIRSTNAME" - FIRST word is last name on Ontario DL
+                parts = full_name.strip().split()
+                if len(parts) >= 1:
+                    return parts[0].strip(), "full_name_first_word"
 
         # Fall back to dedicated last_name field
         last_name = document_data.get("last_name", "") or ""
         if last_name:
             return last_name.strip(), "last_name_field"
-
-        # Try full_name without comma (assume "FIRSTNAME LASTNAME" format)
-        if full_name:
-            parts = full_name.strip().split()
-            if len(parts) >= 2:
-                # Assume last word is last name
-                return parts[-1].strip(), "full_name_last_word"
 
         return "", "not_found"
 

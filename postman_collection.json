@@ -33,6 +33,20 @@
             "description": "Check the health status of the OCR service and verify EasyOCR and Tesseract availability.\n\nNo authentication required."
           },
           "response": []
+        },
+        {
+          "name": "Database Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/db",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "db"]
+            },
+            "description": "Check database connectivity and return request log count.\n\nReturns:\n- status: healthy/error\n- message: connection status\n- database_url: masked connection string\n- log_count: number of logged requests\n\nNo authentication required."
+          },
+          "response": []
         }
       ]
     },
@@ -58,7 +72,7 @@
                   "key": "file",
                   "type": "file",
                   "src": "",
-                  "description": "ID document image (PNG, JPG, JPEG, TIFF, BMP, WEBP)"
+                  "description": "ID document image (PNG, JPG, JPEG, TIFF, BMP, WEBP) or PDF"
                 }
               ]
             },
@@ -67,7 +81,51 @@
               "host": ["{{baseUrl}}"],
               "path": ["ocr", "extract", "image"]
             },
-            "description": "Extract structured fields from an ID document image using Claude Haiku Vision.\n\nExtracts: first_name, last_name, full_name, document_number, date_of_birth, issue_date, expiry_date, gender, address\n\nRequired fields: first_name, last_name, document_number, date_of_birth, expiry_date\n\nReturns success=false if required fields are missing."
+            "description": "Extract structured fields from an ID document image or PDF using Claude Haiku Vision.\n\nSupported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP, PDF\n\nExtracts: first_name, last_name, full_name, document_number, date_of_birth, issue_date, expiry_date, gender, address\n\nRequired fields: first_name, last_name, document_number, date_of_birth, expiry_date\n\nReturns success=false if required fields are missing."
+          },
+          "response": []
+        },
+        {
+          "name": "Extract and Validate Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "ID document image (PNG, JPG, JPEG, TIFF, BMP, WEBP) or PDF"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/extract/image?validate=true&minimum_age=18",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "extract", "image"],
+              "query": [
+                {
+                  "key": "validate",
+                  "value": "true",
+                  "description": "Enable parallel validation checks"
+                },
+                {
+                  "key": "minimum_age",
+                  "value": "18",
+                  "description": "Minimum age requirement for age validation (1-120)"
+                }
+              ]
+            },
+            "description": "Extract structured fields AND run parallel validation checks on an ID document.\n\nValidation checks (run in parallel):\n- Data consistency: DOB vs issue/expiry date logic\n- Document expiry: Is document expired?\n- Age validation: Meets minimum age requirement?\n- Document format: Matches known ID number patterns?\n- Face matching: Placeholder for selfie comparison\n\nReturns validation_summary with overall_status and validation_score (0-1).\nReturns validation_results array with individual check results."
           },
           "response": []
         }
@@ -190,6 +248,104 @@
               ]
             },
             "description": "Extract text from a scanned PDF using OCRmyPDF/Tesseract with forced OCR.\n\nUse this for scanned documents or image-based PDFs."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PDF Tools",
+      "item": [
+        {
+          "name": "Convert PDF to Image (Single Page)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "PDF file to convert"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/pdf-to-image?page=1&scale=2.0&format=png",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "pdf-to-image"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number to convert (1-indexed)"
+                },
+                {
+                  "key": "scale",
+                  "value": "2.0",
+                  "description": "Scale factor for image resolution (0.5-4.0)"
+                },
+                {
+                  "key": "format",
+                  "value": "png",
+                  "description": "Output format: 'png' or 'jpeg'"
+                }
+              ]
+            },
+            "description": "Convert a single page of a PDF to an image.\n\nReturns: PNG or JPEG image file\n\nParameters:\n- page: Page number (1-indexed)\n- scale: Resolution scale (0.5-4.0, default 2.0)\n- format: Output format (png or jpeg)"
+          },
+          "response": []
+        },
+        {
+          "name": "Convert PDF to Images (All Pages)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "API key for authentication"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "PDF file to convert"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ocr/pdf-to-image?scale=2.0&format=png",
+              "host": ["{{baseUrl}}"],
+              "path": ["ocr", "pdf-to-image"],
+              "query": [
+                {
+                  "key": "scale",
+                  "value": "2.0",
+                  "description": "Scale factor for image resolution (0.5-4.0)"
+                },
+                {
+                  "key": "format",
+                  "value": "png",
+                  "description": "Output format: 'png' or 'jpeg'"
+                }
+              ]
+            },
+            "description": "Convert all pages of a PDF to images.\n\nReturns: ZIP file containing all page images\n\nParameters:\n- scale: Resolution scale (0.5-4.0, default 2.0)\n- format: Output format (png or jpeg)"
           },
           "response": []
         }

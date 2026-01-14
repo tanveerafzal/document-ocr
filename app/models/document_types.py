@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class DocumentType(str, Enum):
     """Supported document types for validation."""
     ONTARIO_DRIVERS_LICENSE = "ontario_drivers_license"
+    BC_DRIVERS_LICENSE = "bc_drivers_license"
     CANADIAN_PASSPORT = "canadian_passport"
     US_DRIVERS_LICENSE = "us_drivers_license"
     US_PASSPORT = "us_passport"
@@ -31,6 +32,14 @@ DOCUMENT_PATTERNS = {
         "state_province": "Ontario",
         "license_format": r"^[A-Z]\d{4}-\d{5}-\d{5}$",
         "keywords": ["ontario", "driver's licence", "driver licence", "class g", "class g1", "class g2"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.BC_DRIVERS_LICENSE: {
+        "name": "BC Driver's Licence",
+        "country": "Canada",
+        "state_province": "British Columbia",
+        "license_format": r"^\d{7}$",
+        "keywords": ["british columbia", "bc", "driver's licence", "driver licence", "class 5", "class 7"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.CANADIAN_PASSPORT: {
