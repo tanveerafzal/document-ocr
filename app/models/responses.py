@@ -84,9 +84,19 @@ class ValidationSummary(BaseModel):
     skipped_checks: int
 
 
+class DocumentTypeResult(BaseModel):
+    """Detected document type information."""
+    document_type: str
+    document_name: str
+    confidence: float
+    country: Optional[str] = None
+    state_province: Optional[str] = None
+
+
 class DocumentValidationResponse(BaseModel):
     """Extended response with extraction and validation results."""
     success: bool
+    document_type: Optional[DocumentTypeResult] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     full_name: Optional[str] = None

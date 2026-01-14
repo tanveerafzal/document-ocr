@@ -15,6 +15,7 @@ from app.models.responses import (
     PageResult,
     DocumentExtractResponse,
     DocumentValidationResponse,
+    DocumentTypeResult,
     ValidationStatus,
 )
 from app.services.image_ocr import ImageOCRService
@@ -264,9 +265,10 @@ async def extract_document_from_image(
         # Run validation if requested
         validation_summary = None
         validation_results = None
+        document_type_info = None
         if validate:
             validation_service = ValidationService(minimum_age=minimum_age)
-            validation_summary, validation_results = await validation_service.validate_document(
+            validation_summary, validation_results, document_type_info = await validation_service.validate_document(
                 extracted_fields,
                 request_id=request_id
             )
@@ -277,8 +279,21 @@ async def extract_document_from_image(
         if validate:
             # With validation: success requires both extraction and validation to pass
             overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED
+
+            # Build document type result
+            doc_type_result = None
+            if document_type_info:
+                doc_type_result = DocumentTypeResult(
+                    document_type=document_type_info.document_type.value,
+                    document_name=document_type_info.document_name,
+                    confidence=document_type_info.confidence,
+                    country=document_type_info.country,
+                    state_province=document_type_info.state_province
+                )
+
             response = DocumentValidationResponse(
                 success=overall_success,
+                document_type=doc_type_result,
                 first_name=extracted_fields.get("first_name"),
                 last_name=extracted_fields.get("last_name"),
                 full_name=extracted_fields.get("full_name"),

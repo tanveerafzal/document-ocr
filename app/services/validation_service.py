@@ -1,18 +1,23 @@
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 from app.models.responses import (
     ValidatorResult,
     ValidationSummary,
     ValidationStatus,
 )
+from app.models.document_types import DocumentType, DocumentTypeInfo
 from app.services.validators.base import BaseValidator
 from app.services.validators.data_consistency import DataConsistencyValidator
 from app.services.validators.document_expiry import DocumentExpiryValidator
 from app.services.validators.age_validator import AgeValidator
 from app.services.validators.document_format import DocumentFormatValidator
 from app.services.validators.face_matching import FaceMatchingValidator
+from app.services.validators.ontario_dl import OntarioDriversLicenseValidator
+from app.services.document_type_detector import DocumentTypeDetector
 
 # Configure logging for this module
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +31,7 @@ VALIDATOR_DESCRIPTIONS = {
     "age_validation": "Checking if person meets minimum age requirement",
     "document_format": "Checking if document number matches known formats",
     "face_matching": "Checking face match between document and selfie",
+    "ontario_drivers_license": "Validating Ontario DL: format, name match, age, expiry on birthday, DOB in last 6 digits",
 }
 
 
@@ -44,7 +50,11 @@ class ValidationService:
             minimum_age: Minimum age requirement for age validation
             selfie_image: Optional selfie image bytes for face matching
         """
-        self.validators: List[BaseValidator] = [
+        self.minimum_age = minimum_age
+        self.selfie_image = selfie_image
+
+        # Base validators that run for all document types
+        self.base_validators: List[BaseValidator] = [
             DataConsistencyValidator(),
             DocumentExpiryValidator(),
             AgeValidator(minimum_age=minimum_age),
@@ -52,11 +62,19 @@ class ValidationService:
             FaceMatchingValidator(selfie_image=selfie_image),
         ]
 
+        # Document-type specific validators
+        self.document_type_validators: Dict[DocumentType, List[BaseValidator]] = {
+            DocumentType.ONTARIO_DRIVERS_LICENSE: [
+                OntarioDriversLicenseValidator(),
+            ],
+            # Add more document types here as needed
+        }
+
     async def validate_document(
         self,
         document_data: Dict[str, Any],
         request_id: str = ""
-    ) -> Tuple[ValidationSummary, List[ValidatorResult]]:
+    ) -> Tuple[ValidationSummary, List[ValidatorResult], Optional[DocumentTypeInfo]]:
         """
         Run all validators in parallel on document data.
 
@@ -65,30 +83,79 @@ class ValidationService:
             request_id: Optional request ID for logging correlation
 
         Returns:
-            Tuple of (ValidationSummary, List[ValidatorResult])
+            Tuple of (ValidationSummary, List[ValidatorResult], DocumentTypeInfo)
         """
         log_prefix = f"[{request_id}]" if request_id else ""
 
-        # Log validation start with clear banner
+        # Step 1: Detect document type
         print(f"{log_prefix} ========== DOCUMENT VALIDATION STARTED ==========")
         logger.info(f"{log_prefix} ========== DOCUMENT VALIDATION STARTED ==========")
-        logger.info(f"{log_prefix} Running {len(self.validators)} validation checks in parallel:")
+
+        logger.info(f"{log_prefix} Step 1: Detecting document type...")
+        print(f"{log_prefix} Step 1: Detecting document type...")
+
+        document_type_info = DocumentTypeDetector.detect(document_data, request_id)
+
+        doc_type_msg = (
+            f"{log_prefix}   Detected: {document_type_info.document_name} "
+            f"(confidence: {document_type_info.confidence:.0%})"
+        )
+        logger.info(doc_type_msg)
+        print(doc_type_msg)
+
+        if document_type_info.detected_features:
+            features_msg = f"{log_prefix}   Features: {', '.join(document_type_info.detected_features)}"
+            logger.info(features_msg)
+            print(features_msg)
+
+        # Step 2: Build validator list based on document type
+        logger.info(f"{log_prefix} Step 2: Building validation checks...")
+        print(f"{log_prefix} Step 2: Building validation checks...")
+
+        validators = list(self.base_validators)
+
+        # Add document-type specific validators
+        if document_type_info.document_type in self.document_type_validators:
+            type_specific = self.document_type_validators[document_type_info.document_type]
+            validators.extend(type_specific)
+            logger.info(
+                f"{log_prefix}   Added {len(type_specific)} {document_type_info.document_name}-specific checks"
+            )
+            print(
+                f"{log_prefix}   Added {len(type_specific)} {document_type_info.document_name}-specific checks"
+            )
+
+        logger.info(f"{log_prefix} Step 3: Running {len(validators)} validation checks in PARALLEL THREADS:")
+        print(f"{log_prefix} Step 3: Running {len(validators)} validation checks in PARALLEL THREADS:")
 
         # Log what each validator will check
-        for validator in self.validators:
-            description = VALIDATOR_DESCRIPTIONS.get(validator.name, "Unknown check")
+        for validator in validators:
+            description = VALIDATOR_DESCRIPTIONS.get(validator.name, "Document-specific validation")
             logger.info(f"{log_prefix}   -> {validator.name}: {description}")
+            print(f"{log_prefix}   -> {validator.name}: {description}")
 
-        # Run all validators in parallel using asyncio.gather
-        validation_tasks = [
-            validator.validate(document_data)
-            for validator in self.validators
-        ]
+        # Run all validators in parallel using ThreadPoolExecutor
+        # This ensures true parallel execution in separate threads
+        def run_validator_in_thread(validator: BaseValidator) -> ValidatorResult:
+            """Run async validator in a new event loop within a thread."""
+            thread_name = threading.current_thread().name
+            logger.debug(f"{log_prefix}   [{validator.name}] Running in thread: {thread_name}")
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                return loop.run_until_complete(validator.validate(document_data))
+            finally:
+                loop.close()
 
-        results: List[Any] = await asyncio.gather(
-            *validation_tasks,
-            return_exceptions=True
-        )
+        # Use ThreadPoolExecutor for true parallel execution
+        with ThreadPoolExecutor(max_workers=len(validators), thread_name_prefix="validator") as executor:
+            futures = [executor.submit(run_validator_in_thread, v) for v in validators]
+            results: List[Any] = []
+            for future in futures:
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    results.append(e)
 
         # Log results header
         logger.info(f"{log_prefix} ---------- VALIDATION RESULTS ----------")
@@ -97,8 +164,7 @@ class ValidationService:
         # Handle any exceptions that occurred and log each result
         processed_results: List[ValidatorResult] = []
         for i, result in enumerate(results):
-            validator_name = self.validators[i].name
-            description = VALIDATOR_DESCRIPTIONS.get(validator_name, "")
+            validator_name = validators[i].name
 
             if isinstance(result, Exception):
                 log_msg = f"{log_prefix}   [FAIL] {validator_name}: ERROR - {str(result)}"
@@ -128,6 +194,7 @@ class ValidationService:
         # Log summary with clear banner
         summary_msg = (
             f"{log_prefix} ========== VALIDATION COMPLETE ==========\n"
+            f"{log_prefix}   Document Type: {document_type_info.document_name}\n"
             f"{log_prefix}   Overall Status: {summary.overall_status.value.upper()}\n"
             f"{log_prefix}   Validation Score: {summary.validation_score}\n"
             f"{log_prefix}   Passed: {summary.passed_checks} | "
@@ -139,7 +206,7 @@ class ValidationService:
         logger.info(summary_msg)
         print(summary_msg)
 
-        return summary, processed_results
+        return summary, processed_results, document_type_info
 
     def _get_status_icon(self, status: ValidationStatus) -> str:
         """Get a status indicator for logging."""
