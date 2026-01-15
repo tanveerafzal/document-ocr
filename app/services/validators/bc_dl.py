@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, Tuple
 from app.services.validators.base import BaseValidator
 from app.models.responses import ValidatorResult, ValidationStatus
+from app.services.verifik_client import verifik_client, VerifikValidationStatus
 
 
 class BCDriversLicenseValidator(BaseValidator):
@@ -202,6 +203,37 @@ class BCDriversLicenseValidator(BaseValidator):
                                 f"Person was {age_at_issue} at issue date. "
                                 "BC requires minimum 16 for any licence"
                             )
+
+        # Check 7: Verifik API validation (only if no issues so far)
+        details["checks_performed"].append("verifik_api_validation")
+        verifik_result = None
+
+        if not issues and verifik_client.is_enabled():
+            # Last name is mandatory for BC DL Verifik validation
+            if not last_name:
+                issues.append("Last name is required for BC DL validation via Verifik API")
+                details["verifik_api_enabled"] = True
+                details["verifik_api_validated"] = False
+                details["verifik_api_error"] = "missing_last_name"
+            else:
+                verifik_result = await verifik_client.validate_bc_dl(clean_number, last_name)
+                details["verifik_api_enabled"] = True
+                details["verifik_api_status"] = verifik_result.status.value
+
+                if verifik_result.status == VerifikValidationStatus.VALID:
+                    details["verifik_api_validated"] = True
+                    if verifik_result.details:
+                        details["verifik_api_data"] = verifik_result.details
+                elif verifik_result.status == VerifikValidationStatus.INVALID:
+                    issues.append(f"Verifik API: {verifik_result.message}")
+                    details["verifik_api_validated"] = False
+                elif verifik_result.status == VerifikValidationStatus.ERROR:
+                    warnings.append(f"Verifik API: {verifik_result.message}")
+                    details["verifik_api_error"] = verifik_result.message
+        else:
+            details["verifik_api_enabled"] = verifik_client.is_enabled()
+            if issues:
+                details["verifik_api_skipped_reason"] = "local_validation_failed"
 
         execution_time = (time.perf_counter() - start_time) * 1000
 

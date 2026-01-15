@@ -3,6 +3,12 @@ import subprocess
 from datetime import datetime
 
 
+# Verifik API Configuration
+VERIFIK_API_ENABLED = os.environ.get("VERIFIK_API_ENABLED", "false").lower() == "true"
+VERIFIK_API_TOKEN = os.environ.get("VERIFIK_API_TOKEN", "")
+VERIFIK_API_BASE_URL = os.environ.get("VERIFIK_API_BASE_URL", "https://api.verifik.co/v2")
+
+
 def get_build_number() -> str:
     """Get build number from environment or generate from git/timestamp."""
     # First check environment variable

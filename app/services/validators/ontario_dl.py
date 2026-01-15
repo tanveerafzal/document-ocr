@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, Any
 from app.services.validators.base import BaseValidator
 from app.models.responses import ValidatorResult, ValidationStatus
+from app.services.verifik_client import verifik_client, VerifikValidationStatus
 
 
 class OntarioDriversLicenseValidator(BaseValidator):
@@ -172,6 +173,30 @@ class OntarioDriversLicenseValidator(BaseValidator):
                         f"Last 6 digits of license '{last_6_digits}' do not match "
                         f"DOB in YYMMDD format '{expected_dob}'"
                     )
+
+        # Check 7: Verifik API validation (only if no issues so far)
+        details["checks_performed"].append("verifik_api_validation")
+        verifik_result = None
+
+        if not issues and verifik_client.is_enabled():
+            verifik_result = await verifik_client.validate_ontario_dl(clean_number)
+            details["verifik_api_enabled"] = True
+            details["verifik_api_status"] = verifik_result.status.value
+
+            if verifik_result.status == VerifikValidationStatus.VALID:
+                details["verifik_api_validated"] = True
+                if verifik_result.details:
+                    details["verifik_api_data"] = verifik_result.details
+            elif verifik_result.status == VerifikValidationStatus.INVALID:
+                issues.append(f"Verifik API: {verifik_result.message}")
+                details["verifik_api_validated"] = False
+            elif verifik_result.status == VerifikValidationStatus.ERROR:
+                warnings.append(f"Verifik API: {verifik_result.message}")
+                details["verifik_api_error"] = verifik_result.message
+        else:
+            details["verifik_api_enabled"] = verifik_client.is_enabled()
+            if issues:
+                details["verifik_api_skipped_reason"] = "local_validation_failed"
 
         execution_time = (time.perf_counter() - start_time) * 1000
 
