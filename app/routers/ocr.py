@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Optional
+from typing import Optional, Union
 from io import BytesIO
 from datetime import datetime
 
@@ -10,10 +10,18 @@ from PIL import Image
 import fitz
 import zipfile
 
-from app.models.responses import OCRResponse, PageResult, DocumentExtractResponse
+from app.models.responses import (
+    OCRResponse,
+    PageResult,
+    DocumentExtractResponse,
+    DocumentValidationResponse,
+    DocumentTypeResult,
+    ValidationStatus,
+)
 from app.services.image_ocr import ImageOCRService
 from app.services.pdf_ocr import PDFOCRService
 from app.services.document_extractor import DocumentExtractorService
+from app.services.validation_service import ValidationService
 from app.auth import verify_api_key
 
 # Configure logging
@@ -155,17 +163,30 @@ async def extract_text_from_pdf(
 ALLOWED_EXTRACT_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_PDF_TYPES
 
 
-@router.post("/extract/image", response_model=DocumentExtractResponse)
+@router.post("/extract/image", response_model=Union[DocumentExtractResponse, DocumentValidationResponse])
 async def extract_document_from_image(
     request: Request,
-    file: UploadFile = File(...)
-) -> DocumentExtractResponse:
+    file: UploadFile = File(...),
+    validate: bool = Query(
+        default=False,
+        description="Run validation checks after extraction (parallel execution)"
+    ),
+    minimum_age: int = Query(
+        default=18,
+        ge=1,
+        le=120,
+        description="Minimum age requirement for age validation"
+    )
+) -> Union[DocumentExtractResponse, DocumentValidationResponse]:
     """
     Extract structured document fields from an image or PDF using Claude Vision (Haiku).
 
     Supported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP, PDF
 
     Required fields: first_name, last_name, document_number, date_of_birth, expiry_date
+
+    Optional: Set validate=true to run parallel validation checks (data consistency,
+    document expiry, age verification, document format validation).
 
     Returns extracted fields like name, document number, dates, etc.
     """
@@ -177,6 +198,7 @@ async def extract_document_from_image(
     logger.info(f"[{request_id}]   Client IP: {client_ip}")
     logger.info(f"[{request_id}]   Filename: {file.filename}")
     logger.info(f"[{request_id}]   Content-Type: {file.content_type}")
+    logger.info(f"[{request_id}]   Validate: {validate}, Min Age: {minimum_age}")
 
     if file.content_type not in ALLOWED_EXTRACT_TYPES:
         logger.warning(f"[{request_id}]   Rejected: Unsupported file type")
@@ -240,23 +262,69 @@ async def extract_document_from_image(
             media_type=media_type
         )
 
+        # Run validation if requested
+        validation_summary = None
+        validation_results = None
+        document_type_info = None
+        if validate:
+            validation_service = ValidationService(minimum_age=minimum_age)
+            validation_summary, validation_results, document_type_info = await validation_service.validate_document(
+                extracted_fields,
+                request_id=request_id
+            )
+
         processing_time = time.time() - start_time
 
-        response = DocumentExtractResponse(
-            success=is_valid,
-            first_name=extracted_fields.get("first_name"),
-            last_name=extracted_fields.get("last_name"),
-            full_name=extracted_fields.get("full_name"),
-            document_number=extracted_fields.get("document_number"),
-            date_of_birth=extracted_fields.get("date_of_birth"),
-            issue_date=extracted_fields.get("issue_date"),
-            expiry_date=extracted_fields.get("expiry_date"),
-            gender=extracted_fields.get("gender"),
-            address=extracted_fields.get("address"),
-            missing_fields=missing_fields if not is_valid else None,
-            processing_time_seconds=round(processing_time, 3),
-            error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
-        )
+        # Determine overall success
+        if validate:
+            # With validation: success requires both extraction and validation to pass
+            overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED
+
+            # Build document type result
+            doc_type_result = None
+            if document_type_info:
+                doc_type_result = DocumentTypeResult(
+                    document_type=document_type_info.document_type.value,
+                    document_name=document_type_info.document_name,
+                    confidence=document_type_info.confidence,
+                    country=document_type_info.country,
+                    state_province=document_type_info.state_province
+                )
+
+            response = DocumentValidationResponse(
+                success=overall_success,
+                document_type=doc_type_result,
+                first_name=extracted_fields.get("first_name"),
+                last_name=extracted_fields.get("last_name"),
+                full_name=extracted_fields.get("full_name"),
+                document_number=extracted_fields.get("document_number"),
+                date_of_birth=extracted_fields.get("date_of_birth"),
+                issue_date=extracted_fields.get("issue_date"),
+                expiry_date=extracted_fields.get("expiry_date"),
+                gender=extracted_fields.get("gender"),
+                address=extracted_fields.get("address"),
+                missing_fields=missing_fields if not is_valid else None,
+                validation_summary=validation_summary,
+                validation_results=validation_results,
+                processing_time_seconds=round(processing_time, 3),
+                error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
+            )
+        else:
+            response = DocumentExtractResponse(
+                success=is_valid,
+                first_name=extracted_fields.get("first_name"),
+                last_name=extracted_fields.get("last_name"),
+                full_name=extracted_fields.get("full_name"),
+                document_number=extracted_fields.get("document_number"),
+                date_of_birth=extracted_fields.get("date_of_birth"),
+                issue_date=extracted_fields.get("issue_date"),
+                expiry_date=extracted_fields.get("expiry_date"),
+                gender=extracted_fields.get("gender"),
+                address=extracted_fields.get("address"),
+                missing_fields=missing_fields if not is_valid else None,
+                processing_time_seconds=round(processing_time, 3),
+                error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
+            )
 
         # Log response
         logger.info(f"[{request_id}] RESPONSE:")
