@@ -19,6 +19,7 @@ class OntarioDriversLicenseValidator(BaseValidator):
     - License classes: G1, G2, G, M1, M2, M, etc.
     - Expiry is typically on the holder's birthday
     - Last 6 digits encode DOB in YYMMDD format
+      - For female license holders, 50 is added to the month (e.g., June/06 becomes 56)
     - Minimum age for G1: 16, G2: 17 (after 12 months), G: 18 (after 12 months)
     """
 
@@ -153,6 +154,7 @@ class OntarioDriversLicenseValidator(BaseValidator):
                     warnings.append(f"Validity period ({validity_years:.1f} years) exceeds typical 5-year Ontario DL term")
 
         # Check 6: Last 6 digits of license number match DOB in YYMMDD format
+        # For female license holders, 50 is added to the month (e.g., June/06 becomes 56)
         details["checks_performed"].append("dob_encoded_in_license")
         if clean_number and date_of_birth:
             dob = self._parse_date(date_of_birth)
@@ -161,17 +163,42 @@ class OntarioDriversLicenseValidator(BaseValidator):
                 clean_number_no_hyphen = re.sub(r"[-\s]", "", clean_number)
                 last_6_digits = clean_number_no_hyphen[-6:]
 
-                # Format DOB as YYMMDD
-                expected_dob = dob.strftime("%y%m%d")
-                details["license_last_6"] = last_6_digits
-                details["expected_dob_yymmdd"] = expected_dob
+                # Format DOB as YYMMDD (male encoding)
+                expected_dob_male = dob.strftime("%y%m%d")
+                # Female encoding: add 50 to month (06 -> 56)
+                female_month = dob.month + 50
+                expected_dob_female = f"{dob.strftime('%y')}{female_month:02d}{dob.strftime('%d')}"
 
-                if last_6_digits == expected_dob:
+                details["license_last_6"] = last_6_digits
+                details["expected_dob_male"] = expected_dob_male
+                details["expected_dob_female"] = expected_dob_female
+
+                # Get gender from document if available
+                gender = (document_data.get("gender", "") or "").upper().strip()
+                details["document_gender"] = gender if gender else "not_provided"
+
+                if last_6_digits == expected_dob_male:
                     details["dob_encoded_in_license"] = True
+                    details["detected_encoding"] = "male"
+                    # If gender is provided, check consistency
+                    if gender and gender in ["F", "FEMALE"]:
+                        warnings.append(
+                            f"License uses male DOB encoding but gender is '{gender}'. "
+                            "Expected female encoding with month +50."
+                        )
+                elif last_6_digits == expected_dob_female:
+                    details["dob_encoded_in_license"] = True
+                    details["detected_encoding"] = "female"
+                    # If gender is provided, check consistency
+                    if gender and gender in ["M", "MALE"]:
+                        warnings.append(
+                            f"License uses female DOB encoding (month +50) but gender is '{gender}'."
+                        )
                 else:
                     issues.append(
                         f"Last 6 digits of license '{last_6_digits}' do not match "
-                        f"DOB in YYMMDD format '{expected_dob}'"
+                        f"DOB encoding. Expected '{expected_dob_male}' (male) or "
+                        f"'{expected_dob_female}' (female with month +50)"
                     )
 
         # Check 7: Verifik API validation (only if no issues so far)
