@@ -41,6 +41,14 @@ class HealthResponse(BaseModel):
     tesseract_available: bool
 
 
+class FakeDocumentResult(BaseModel):
+    """Fake/specimen document detection result."""
+    is_fake: bool
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence that document is fake (0-1)")
+    reasons: List[str] = Field(default_factory=list, description="Reasons why document was flagged")
+    checks_performed: List[str] = Field(default_factory=list, description="List of checks performed")
+
+
 class DocumentExtractResponse(BaseModel):
     success: bool
     first_name: Optional[str] = None
@@ -53,6 +61,7 @@ class DocumentExtractResponse(BaseModel):
     gender: Optional[str] = None
     address: Optional[str] = None
     missing_fields: Optional[List[str]] = None
+    fake_detection: Optional[FakeDocumentResult] = None
     processing_time_seconds: Optional[float] = None
     error: Optional[str] = None
 
@@ -107,6 +116,7 @@ class DocumentValidationResponse(BaseModel):
     gender: Optional[str] = None
     address: Optional[str] = None
     missing_fields: Optional[List[str]] = None
+    fake_detection: Optional[FakeDocumentResult] = None
     validation_summary: Optional[ValidationSummary] = None
     validation_results: Optional[List[ValidatorResult]] = None
     processing_time_seconds: Optional[float] = None
