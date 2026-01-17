@@ -7,6 +7,7 @@ class DocumentType(str, Enum):
     """Supported document types for validation."""
     # Canadian Provinces
     ONTARIO_DRIVERS_LICENSE = "ontario_drivers_license"
+    ONTARIO_HEALTH_CARD = "ontario_health_card"
     BC_DRIVERS_LICENSE = "bc_drivers_license"
     ALBERTA_DRIVERS_LICENSE = "alberta_drivers_license"
     QUEBEC_DRIVERS_LICENSE = "quebec_drivers_license"
@@ -46,6 +47,14 @@ DOCUMENT_PATTERNS = {
         "state_province": "Ontario",
         "license_format": r"^[A-Z]\d{4}-\d{5}-\d{5}$",
         "keywords": ["ontario", "driver's licence", "driver licence", "class g", "class g1", "class g2"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.ONTARIO_HEALTH_CARD: {
+        "name": "Ontario Health Card",
+        "country": "Canada",
+        "state_province": "Ontario",
+        "license_format": r"^\d{10}[A-Z]{2}$",
+        "keywords": ["ontario", "health card", "ohip", "ministry of health", "carte santé"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.BC_DRIVERS_LICENSE: {

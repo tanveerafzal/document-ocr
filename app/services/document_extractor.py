@@ -1,11 +1,23 @@
 import os
 import json
 import base64
+import logging
 from anthropic import Anthropic
 from typing import Optional, Tuple, List
 
+logger = logging.getLogger(__name__)
 
 REQUIRED_FIELDS = ["first_name", "last_name", "document_number", "date_of_birth", "expiry_date"]
+
+# Claude model for document extraction - configurable via environment variable
+# Options (in order of quality/cost):
+#   - claude-3-haiku-20240307    (fastest, cheapest - default)
+#   - claude-3-5-haiku-20241022  (faster haiku, good quality)
+#   - claude-3-sonnet-20240229   (better quality)
+#   - claude-3-5-sonnet-20241022 (recommended for better accuracy)
+#   - claude-3-opus-20240229     (best quality, slowest, most expensive)
+CLAUDE_MODEL = os.environ.get("CLAUDE_VISION_MODEL", "claude-3-haiku-20240307")
+logger.info(f"Document extraction using Claude model: {CLAUDE_MODEL}")
 
 VISION_PROMPT = """Analyze this identity document image and extract the following fields.
 
@@ -93,7 +105,7 @@ class DocumentExtractorService:
 
         try:
             response = client.messages.create(
-                model="claude-3-haiku-20240307",
+                model=CLAUDE_MODEL,
                 max_tokens=1000,
                 messages=[
                     {
