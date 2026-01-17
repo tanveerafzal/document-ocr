@@ -78,7 +78,10 @@ IMPORTANT for Passports:
 - Extract the MRZ (Machine Readable Zone) - the 2 lines of <<< text at the bottom
 - Extract the country code from the MRZ (positions 3-5 of line 1, e.g., "P<CAN" = Canada)
 - Extract the 3-letter ISO country code (e.g., CAN, USA, GBR, IND, AUS, DEU, FRA, NGA, CHN, COL, UKR, MEX, BRA, JPN, KOR, etc.)
-- The country_code field is CRITICAL for passport identification - always extract it from the MRZ
+- Some passports (e.g., Indian) show "Code" instead of "Country Code" - extract from this field as well
+- If the MRZ shows "P<IND" or document shows "Code: IND" or "INDIA", set country_code to "IND"
+- The country_code field is CRITICAL for passport identification - always extract it from the MRZ or Code field
+- If document shows "Passport No" or "Passport Number", it is definitely a passport
 - Passport number formats vary by country:
   - Canada: 2 letters + 6 digits (AB123456)
   - USA: 9 digits
@@ -200,6 +203,17 @@ class DocumentExtractorService:
             for field in fields:
                 if field not in extracted_data:
                     extracted_data[field] = None
+
+            # Clean up special characters in text fields
+            text_fields_to_clean = ["address", "full_name", "first_name", "last_name"]
+            for field in text_fields_to_clean:
+                if extracted_data.get(field) and isinstance(extracted_data[field], str):
+                    # Replace newlines, tabs, and multiple spaces with single space
+                    cleaned = extracted_data[field].replace("\n", " ").replace("\r", " ").replace("\t", " ")
+                    # Collapse multiple spaces into one
+                    while "  " in cleaned:
+                        cleaned = cleaned.replace("  ", " ")
+                    extracted_data[field] = cleaned.strip()
 
             # Validate required fields
             is_valid, missing_fields = cls.validate_required_fields(extracted_data)

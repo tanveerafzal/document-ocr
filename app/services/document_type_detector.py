@@ -12,7 +12,7 @@ class DocumentTypeDetector:
     """Detects the type of ID document based on extracted fields and patterns."""
 
     # Keywords for each document category
-    PASSPORT_KEYWORDS = ["passport", "passeport", "pasaporte", "reisepass", "паспорт"]
+    PASSPORT_KEYWORDS = ["passport", "passeport", "pasaporte", "reisepass", "паспорт", "passport no", "passport number"]
 
     DL_KEYWORDS = ["driver", "licence", "license", "permis", "conduire", "operator"]
 
@@ -416,41 +416,54 @@ class DocumentTypeDetector:
                 )
 
         # 1e. PASSPORT
-        if has_passport_keyword and country_code:
-            logger.info(f"{log_prefix}   Passport keyword found with country code {country_code}")
+        if has_passport_keyword or is_passport_by_title:
+            logger.info(f"{log_prefix}   Passport keyword found (country_code: {country_code or 'none'})")
 
-            # Check if this country code has a specific passport validator
-            specific_passport_type = None
-            for doc_type, patterns in DOCUMENT_PATTERNS.items():
-                pattern_country_code = patterns.get("country_code")
-                if pattern_country_code and pattern_country_code.upper() == country_code:
-                    specific_passport_type = doc_type
-                    break
+            if country_code:
+                # Check if this country code has a specific passport validator
+                specific_passport_type = None
+                for doc_type, patterns in DOCUMENT_PATTERNS.items():
+                    pattern_country_code = patterns.get("country_code")
+                    if pattern_country_code and pattern_country_code.upper() == country_code:
+                        specific_passport_type = doc_type
+                        break
 
-            if specific_passport_type:
-                patterns = DOCUMENT_PATTERNS[specific_passport_type]
-                logger.info(f"{log_prefix}   Detected specific passport: {patterns['name']}")
+                if specific_passport_type:
+                    patterns = DOCUMENT_PATTERNS[specific_passport_type]
+                    logger.info(f"{log_prefix}   Detected specific passport: {patterns['name']}")
+                    return DocumentTypeInfo(
+                        document_type=specific_passport_type.value,
+                        document_type_enum=specific_passport_type,
+                        confidence=0.9,
+                        country=patterns.get("country"),
+                        state_province=None,
+                        document_name=patterns["name"],
+                        detected_features=["passport_keyword_found", f"country_code: {country_code}"]
+                    )
+                elif country_code in COUNTRY_CODES:
+                    country_name = COUNTRY_CODES[country_code]
+                    dynamic_doc_type = f"{country_name.lower().replace(' ', '_')}_passport"
+                    logger.info(f"{log_prefix}   Detected generic passport for {country_name}")
+                    return DocumentTypeInfo(
+                        document_type=dynamic_doc_type,
+                        document_type_enum=DocumentType.GENERIC_PASSPORT,
+                        confidence=0.85,
+                        country=country_name,
+                        state_province=None,
+                        document_name=f"{country_name} Passport",
+                        detected_features=["passport_keyword_found", f"country_code: {country_code}"]
+                    )
+            else:
+                # Passport keyword found but no country_code - detect as generic passport
+                logger.info(f"{log_prefix}   Detected Generic Passport (no country code)")
                 return DocumentTypeInfo(
-                    document_type=specific_passport_type.value,
-                    document_type_enum=specific_passport_type,
-                    confidence=0.9,
-                    country=patterns.get("country"),
-                    state_province=None,
-                    document_name=patterns["name"],
-                    detected_features=["passport_keyword_found", f"country_code: {country_code}"]
-                )
-            elif country_code in COUNTRY_CODES:
-                country_name = COUNTRY_CODES[country_code]
-                dynamic_doc_type = f"{country_name.lower().replace(' ', '_')}_passport"
-                logger.info(f"{log_prefix}   Detected generic passport for {country_name}")
-                return DocumentTypeInfo(
-                    document_type=dynamic_doc_type,
+                    document_type=DocumentType.GENERIC_PASSPORT.value,
                     document_type_enum=DocumentType.GENERIC_PASSPORT,
-                    confidence=0.85,
-                    country=country_name,
+                    confidence=0.75,
+                    country=None,
                     state_province=None,
-                    document_name=f"{country_name} Passport",
-                    detected_features=["passport_keyword_found", f"country_code: {country_code}"]
+                    document_name="Passport",
+                    detected_features=["passport_keyword_found", "no_country_code"]
                 )
 
         # ============================================================

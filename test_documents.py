@@ -21,27 +21,30 @@ import time
 
 SUPPORTED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.webp'}
 
-# Thread-safe counter
+# Thread-safe counter and failure tracker
 class Counter:
     def __init__(self):
         self.success = 0
         self.fail = 0
+        self.failures = []  # List of (filename, document_type) tuples
         self.lock = threading.Lock()
 
     def add_success(self):
         with self.lock:
             self.success += 1
 
-    def add_fail(self):
+    def add_fail(self, filename: str = None, document_type: str = None):
         with self.lock:
             self.fail += 1
+            if filename:
+                self.failures.append((filename, document_type or "unknown"))
 
 
 def process_document(file_path: Path, api_url: str, api_key: str) -> dict:
     """
     Send a document image to the OCR extract API and return the result.
     """
-    url = f"{api_url.rstrip('/')}/ocr/extract/image"
+    url = f"{api_url.rstrip('/')}/ocr/extract/image?validate=true"
 
     headers = {
         "X-API-Key": api_key
@@ -84,27 +87,28 @@ def process_single_file(image_file: Path, api_url: str, api_key: str, counter: C
             if result.get("success"):
                 counter.add_success()
                 print(f"[OK] {image_file.name}")
-                print(f"     Name: {result.get('first_name')} {result.get('last_name')}")
-                print(f"     Doc#: {result.get('document_number')} | DOB: {result.get('date_of_birth')}")
             else:
-                counter.add_fail()
+                document_type = result.get("document_type", "unknown")
+                counter.add_fail(image_file.name, document_type)
                 print(f"[FAIL] {image_file.name}")
-                print(f"     {result.get('error', 'Unknown error')}")
-                if result.get("missing_fields"):
-                    print(f"     Missing: {', '.join(result['missing_fields'])}")
-            print(f"     Saved: {output_path.name}")
+
+            # Print full response
+            print("-" * 40)
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            print("-" * 40)
+            print(f"Saved: {output_path.name}")
             print()
 
         return result
 
     except requests.exceptions.ConnectionError:
         with print_lock:
-            counter.add_fail()
+            counter.add_fail(image_file.name, "connection_error")
             print(f"[ERROR] {image_file.name} - Cannot connect to API")
         return None
     except Exception as e:
         with print_lock:
-            counter.add_fail()
+            counter.add_fail(image_file.name, "exception")
             print(f"[ERROR] {image_file.name} - {str(e)}")
         return None
 
@@ -171,6 +175,14 @@ def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: in
     print("-" * 60)
     print(f"\nCompleted: {counter.success} succeeded, {counter.fail} failed")
     print(f"Total time: {elapsed:.2f}s ({elapsed/total:.2f}s per document)")
+
+    # Write failures to text file
+    if counter.failures:
+        failures_file = folder / "failures.txt"
+        with open(failures_file, "w", encoding="utf-8") as f:
+            for filename, doc_type in counter.failures:
+                f.write(f"{filename} failed, document type is {doc_type}\n")
+        print(f"\nFailures saved to: {failures_file}")
 
 
 def main():
