@@ -16,12 +16,14 @@ from app.models.responses import (
     DocumentExtractResponse,
     DocumentValidationResponse,
     DocumentTypeResult,
+    FakeDocumentResult,
     ValidationStatus,
 )
 from app.services.image_ocr import ImageOCRService
 from app.services.pdf_ocr import PDFOCRService
 from app.services.document_extractor import DocumentExtractorService
 from app.services.validation_service import ValidationService
+from app.services.fake_document_detector import FakeDocumentDetector
 from app.auth import verify_api_key
 
 # Configure logging
@@ -262,6 +264,18 @@ async def extract_document_from_image(
             media_type=media_type
         )
 
+        # Run fake document detection
+        fake_detection_result = FakeDocumentDetector.detect(extracted_fields)
+        fake_detection = FakeDocumentResult(
+            is_fake=fake_detection_result["is_fake"],
+            confidence=fake_detection_result["confidence"],
+            reasons=fake_detection_result["reasons"],
+            checks_performed=fake_detection_result["checks_performed"]
+        )
+
+        if fake_detection.is_fake:
+            logger.warning(f"[{request_id}]   FAKE DOCUMENT DETECTED: {fake_detection.reasons}")
+
         # Run validation if requested
         validation_summary = None
         validation_results = None
@@ -277,8 +291,8 @@ async def extract_document_from_image(
 
         # Determine overall success
         if validate:
-            # With validation: success requires both extraction and validation to pass
-            overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED
+            # With validation: success requires extraction, validation to pass, and not fake
+            overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED and not fake_detection.is_fake
 
             # Build document type result
             doc_type_result = None
@@ -304,14 +318,17 @@ async def extract_document_from_image(
                 gender=extracted_fields.get("gender"),
                 address=extracted_fields.get("address"),
                 missing_fields=missing_fields if not is_valid else None,
+                fake_detection=fake_detection,
                 validation_summary=validation_summary,
                 validation_results=validation_results,
                 processing_time_seconds=round(processing_time, 3),
                 error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
             )
         else:
+            # Without validation: success requires extraction and not fake
+            overall_success = is_valid and not fake_detection.is_fake
             response = DocumentExtractResponse(
-                success=is_valid,
+                success=overall_success,
                 first_name=extracted_fields.get("first_name"),
                 last_name=extracted_fields.get("last_name"),
                 full_name=extracted_fields.get("full_name"),
@@ -322,6 +339,7 @@ async def extract_document_from_image(
                 gender=extracted_fields.get("gender"),
                 address=extracted_fields.get("address"),
                 missing_fields=missing_fields if not is_valid else None,
+                fake_detection=fake_detection,
                 processing_time_seconds=round(processing_time, 3),
                 error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
             )
@@ -332,6 +350,7 @@ async def extract_document_from_image(
         logger.info(f"[{request_id}]   Name: {response.first_name} {response.last_name}")
         logger.info(f"[{request_id}]   Doc#: {response.document_number}")
         logger.info(f"[{request_id}]   DOB: {response.date_of_birth}")
+        logger.info(f"[{request_id}]   Fake Detection: is_fake={fake_detection.is_fake}, confidence={fake_detection.confidence}")
         logger.info(f"[{request_id}]   Processing time: {response.processing_time_seconds}s")
         if not is_valid:
             logger.info(f"[{request_id}]   Missing fields: {missing_fields}")
