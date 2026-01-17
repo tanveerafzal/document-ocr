@@ -12,8 +12,9 @@ class BCDriversLicenseValidator(BaseValidator):
     Validate British Columbia Driver's Licence specific requirements.
 
     BC DL specifics:
-    - Licence number format: "DL:" prefix + 6 digits (e.g., DL:423768)
-    - May also appear as just 6-7 digits without prefix
+    - Licence number format: "DL:" or "NDL:" prefix + 7 digits (e.g., DL:1234567 or NDL:1234567)
+    - May also appear as just 7 digits without prefix
+    - "NDL:" prefix indicates BC Driver's Licence (N = Novice or New)
     - Name format on licence: "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME"
     - Licence classes: Class 7L (Learner), Class 7 (Novice/N), Class 5 (Full)
     - Minimum age: 16 for Class 7L, must hold 7L for 12 months before Class 7
@@ -68,24 +69,35 @@ class BCDriversLicenseValidator(BaseValidator):
         expiry_date = document_data.get("expiry_date")
         issue_date_str = document_data.get("issue_date")
 
-        # Check 1: Licence number format (DL:XXXXXX or 6-7 digits)
+        # Check 1: Licence number format (DL:XXXXXXX, NDL:XXXXXXX, or 7 digits)
         details["checks_performed"].append("licence_number_format")
         raw_number = document_number.strip().upper()
 
-        # Remove "DL:" prefix if present
-        if raw_number.startswith("DL:"):
+        # Remove "NDL:" or "DL:" prefix if present
+        if raw_number.startswith("NDL:"):
+            clean_number = raw_number[4:].strip()
+            details["has_ndl_prefix"] = True
+            details["prefix_type"] = "NDL"
+        elif raw_number.startswith("NDL"):
+            clean_number = raw_number[3:].strip()
+            details["has_ndl_prefix"] = True
+            details["prefix_type"] = "NDL"
+        elif raw_number.startswith("DL:"):
             clean_number = raw_number[3:].strip()
             details["has_dl_prefix"] = True
+            details["prefix_type"] = "DL"
         elif raw_number.startswith("DL"):
             clean_number = raw_number[2:].strip()
             details["has_dl_prefix"] = True
+            details["prefix_type"] = "DL"
         else:
             clean_number = re.sub(r"[\s\-]", "", raw_number)
             details["has_dl_prefix"] = False
+            details["has_ndl_prefix"] = False
 
-        # BC format: 6 digits (with DL: prefix) or 7 digits (without)
-        bc_format_6 = r"^\d{6}$"
+        # BC format: 7 digits
         bc_format_7 = r"^\d{7}$"
+        bc_format_6 = r"^\d{6}$"
 
         if not clean_number:
             issues.append("Missing licence number")

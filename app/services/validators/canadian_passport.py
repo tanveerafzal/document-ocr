@@ -32,31 +32,16 @@ class CanadianPassportValidator(BaseValidator):
         issue_date_str = document_data.get("issue_date")
         expiry_date = document_data.get("expiry_date")
 
-        # Check 1: Passport number format (2 letters + 6 digits)
-        details["checks_performed"].append("passport_number_format")
+        # Check 1: Passport number (no format validation - just record it)
+        details["checks_performed"].append("passport_number_check")
         clean_number = document_number.strip().upper()
         # Remove any spaces or special characters
         clean_number = re.sub(r"[\s\-]", "", clean_number)
 
-        canadian_passport_format = r"^[A-Z]{2}\d{6}$"
-
-        if not clean_number:
-            issues.append("Missing passport number")
-        elif not re.match(canadian_passport_format, clean_number):
-            # Check for common OCR errors - must start with 2 letters
-            if len(clean_number) == 8 and clean_number[:2].isalpha():
-                warnings.append(
-                    f"Passport number '{document_number}' may have OCR errors in digit portion. "
-                    "Expected format: AA123456"
-                )
-            else:
-                issues.append(
-                    f"Invalid Canadian passport format. Expected: AA123456 (2 letters + 6 digits), "
-                    f"Got: {document_number}"
-                )
-        else:
-            details["passport_number_valid"] = True
-            details["passport_prefix"] = clean_number[:2]
+        if clean_number:
+            details["passport_number"] = clean_number
+            if len(clean_number) >= 2:
+                details["passport_prefix"] = clean_number[:2]
 
         # Check 2: Calculate age at issue date
         details["checks_performed"].append("age_at_issue")

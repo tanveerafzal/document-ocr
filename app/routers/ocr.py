@@ -284,7 +284,7 @@ async def extract_document_from_image(
             doc_type_result = None
             if document_type_info:
                 doc_type_result = DocumentTypeResult(
-                    document_type=document_type_info.document_type.value,
+                    document_type=document_type_info.document_type,
                     document_name=document_type_info.document_name,
                     confidence=document_type_info.confidence,
                     country=document_type_info.country,
