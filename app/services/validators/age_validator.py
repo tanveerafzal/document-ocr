@@ -39,7 +39,7 @@ class AgeValidator(BaseValidator):
 
         if age < self.minimum_age:
             return self._create_result(
-                status=ValidationStatus.FAILED,
+                status=ValidationStatus.WARNING,
                 message=f"Person is {age} years old, minimum required is {self.minimum_age}",
                 details={
                     "calculated_age": age,

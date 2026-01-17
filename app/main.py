@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import ocr, health
 from app.middleware import RequestLoggingMiddleware
 from app.config import BUILD_NUMBER
+from app.services.document_extractor import CLAUDE_MODEL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
     logger.info("#" * 80)
     logger.info(f"OCR API Service starting...")
     logger.info(f"Build: {BUILD_NUMBER}")
+    logger.info(f"Claude Vision Model: {CLAUDE_MODEL}")
     yield
     # Shutdown
     logger.info(f"OCR API Service shutting down (build: {BUILD_NUMBER})")

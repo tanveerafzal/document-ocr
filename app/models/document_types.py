@@ -21,17 +21,39 @@ class DocumentType(str, Enum):
     NWT_DRIVERS_LICENSE = "nwt_drivers_license"
     NUNAVUT_DRIVERS_LICENSE = "nunavut_drivers_license"
     YUKON_DRIVERS_LICENSE = "yukon_drivers_license"
-    # Other Documents
+    # Passports
     CANADIAN_PASSPORT = "canadian_passport"
-    US_DRIVERS_LICENSE = "us_drivers_license"
     US_PASSPORT = "us_passport"
+    UK_PASSPORT = "uk_passport"
+    INDIA_PASSPORT = "india_passport"
+    AUSTRALIA_PASSPORT = "australia_passport"
+    GERMANY_PASSPORT = "germany_passport"
+    FRANCE_PASSPORT = "france_passport"
+    NIGERIA_PASSPORT = "nigeria_passport"
+    CHINA_PASSPORT = "china_passport"
+    COLOMBIA_PASSPORT = "colombia_passport"
+    UKRAINE_PASSPORT = "ukraine_passport"
+    GENERIC_PASSPORT = "generic_passport"
+    # Photo Cards / Photo IDs
+    ONTARIO_PHOTO_CARD = "ontario_photo_card"
+    BC_PHOTO_ID = "bc_photo_id"
+    ALBERTA_PHOTO_ID = "alberta_photo_id"
+    GENERIC_PHOTO_ID = "generic_photo_id"
+    # Permanent Residence Cards
+    CANADA_PR_CARD = "canada_pr_card"
+    # US State Driver's Licenses
+    CALIFORNIA_DRIVERS_LICENSE = "california_drivers_license"
+    TEXAS_DRIVERS_LICENSE = "texas_drivers_license"
+    # Other Documents
+    US_DRIVERS_LICENSE = "us_drivers_license"
     GENERIC_ID = "generic_id"
     UNKNOWN = "unknown"
 
 
 class DocumentTypeInfo(BaseModel):
     """Information about detected document type."""
-    document_type: DocumentType
+    document_type: str  # Can be enum value or dynamic like "philippines_passport"
+    document_type_enum: Optional[DocumentType] = None  # For internal validator lookup
     confidence: float  # 0-1 confidence score
     country: Optional[str] = None
     state_province: Optional[str] = None
@@ -61,8 +83,8 @@ DOCUMENT_PATTERNS = {
         "name": "BC Driver's Licence",
         "country": "Canada",
         "state_province": "British Columbia",
-        "license_format": r"^(DL:?)?\d{6,7}$",
-        "keywords": ["british columbia", "bc", "driver's licence", "driver licence", "class 5", "class 7"],
+        "license_format": r"^(NDL:?|DL:?)?\d{6,7}$",
+        "keywords": ["british columbia", "bc", "driver's licence", "driver licence", "class 5", "class 7", "ndl"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.ALBERTA_DRIVERS_LICENSE: {
@@ -85,8 +107,8 @@ DOCUMENT_PATTERNS = {
         "name": "Manitoba Driver's Licence",
         "country": "Canada",
         "state_province": "Manitoba",
-        "license_format": r"^[A-Z]{2}-?[A-Z]{2}-?\d{3}-?\d{3}$",
-        "keywords": ["manitoba", "mb", "driver's licence", "driver licence", "class 5"],
+        "license_format": r"^\d{9}$",
+        "keywords": ["manitoba", "mb", "driver's licence", "driver licence", "class 5", "dd/réf", "dd/ref"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.SASKATCHEWAN_DRIVERS_LICENSE: {
@@ -156,9 +178,134 @@ DOCUMENT_PATTERNS = {
     DocumentType.CANADIAN_PASSPORT: {
         "name": "Canadian Passport",
         "country": "Canada",
+        "country_code": "CAN",
         "state_province": None,
         "license_format": r"^[A-Z]{2}\d{6}$",
-        "keywords": ["canada", "passport", "passeport"],
+        "keywords": ["canada", "canadian", "passport", "passeport", "CAN"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.US_PASSPORT: {
+        "name": "US Passport",
+        "country": "United States",
+        "country_code": "USA",
+        "state_province": None,
+        "license_format": r"^\d{9}$",
+        "keywords": ["united states", "usa", "american", "passport", "USA"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.UK_PASSPORT: {
+        "name": "UK Passport",
+        "country": "United Kingdom",
+        "country_code": "GBR",
+        "state_province": None,
+        "license_format": r"^\d{9}$",
+        "keywords": ["united kingdom", "british", "uk", "gbr", "passport", "GBR"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.INDIA_PASSPORT: {
+        "name": "India Passport",
+        "country": "India",
+        "country_code": "IND",
+        "state_province": None,
+        "license_format": r"^[A-Z]\d{7}$",
+        "keywords": ["india", "indian", "republic of india", "passport", "IND"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.AUSTRALIA_PASSPORT: {
+        "name": "Australia Passport",
+        "country": "Australia",
+        "country_code": "AUS",
+        "state_province": None,
+        "license_format": r"^[A-Z]{1,2}\d{7}$",
+        "keywords": ["australia", "australian", "passport", "AUS"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.GERMANY_PASSPORT: {
+        "name": "Germany Passport",
+        "country": "Germany",
+        "country_code": "DEU",
+        "state_province": None,
+        "license_format": r"^[A-Z0-9]{9}$",
+        "keywords": ["germany", "german", "bundesrepublik", "deutschland", "passport", "reisepass", "DEU"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.FRANCE_PASSPORT: {
+        "name": "France Passport",
+        "country": "France",
+        "country_code": "FRA",
+        "state_province": None,
+        "license_format": r"^[A-Z0-9]{9}$",
+        "keywords": ["france", "french", "république française", "passport", "passeport", "FRA"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.NIGERIA_PASSPORT: {
+        "name": "Nigeria Passport",
+        "country": "Nigeria",
+        "country_code": "NGA",
+        "state_province": None,
+        "license_format": r"^[A-Z]\d{8}$",
+        "keywords": ["nigeria", "nigerian", "federal republic of nigeria", "passport", "NGA"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.CHINA_PASSPORT: {
+        "name": "China Passport",
+        "country": "China",
+        "country_code": "CHN",
+        "state_province": None,
+        "license_format": r"^[EGD]\d{8}$",
+        "keywords": ["china", "chinese", "people's republic of china", "中华人民共和国", "passport", "CHN"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.COLOMBIA_PASSPORT: {
+        "name": "Colombia Passport",
+        "country": "Colombia",
+        "country_code": "COL",
+        "state_province": None,
+        "license_format": r"^[A-Z]{2}\d{7}$",
+        "keywords": ["colombia", "colombian", "república de colombia", "passport", "pasaporte", "COL"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.UKRAINE_PASSPORT: {
+        "name": "Ukraine Passport",
+        "country": "Ukraine",
+        "country_code": "UKR",
+        "state_province": None,
+        "license_format": r"^[A-Z]{2}\d{6}$",
+        "keywords": ["ukraine", "ukrainian", "україна", "passport", "паспорт", "UKR"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.GENERIC_PASSPORT: {
+        "name": "International Passport",
+        "country": None,
+        "country_code": None,
+        "state_province": None,
+        "license_format": r"^[A-Z0-9]{6,12}$",
+        "keywords": ["passport", "passeport", "pasaporte", "reisepass", "паспорт"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.CANADA_PR_CARD: {
+        "name": "Canada Permanent Residence Card",
+        "country": "Canada",
+        "country_code": "CAN",
+        "state_province": None,
+        "license_format": r"^[A-Z]{2}\d{6}$",
+        "keywords": ["permanent resident", "permanent residence", "résident permanent", "pr card", "immigration", "canada"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.CALIFORNIA_DRIVERS_LICENSE: {
+        "name": "California Driver's License",
+        "country": "United States",
+        "state_province": "California",
+        "license_format": r"^[A-Z]\d{7}$",
+        "keywords": ["california", "ca", "driver license", "driver's license", "dmv", "state of california"],
+        "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
+    },
+    DocumentType.TEXAS_DRIVERS_LICENSE: {
+        "name": "Texas Driver's License",
+        "country": "United States",
+        "state_province": "Texas",
+        "license_format": r"^\d{8}$",
+        "keywords": ["texas", "tx", "driver license", "driver's license", "dps", "state of texas"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
     DocumentType.US_DRIVERS_LICENSE: {
@@ -169,4 +316,62 @@ DOCUMENT_PATTERNS = {
         "keywords": ["driver license", "driver's license", "dmv"],
         "required_fields": ["first_name", "last_name", "date_of_birth", "expiry_date", "document_number"],
     },
+}
+
+
+# Comprehensive ISO 3166-1 alpha-3 country codes for passport detection
+COUNTRY_CODES = {
+    # Africa
+    "DZA": "Algeria", "AGO": "Angola", "BEN": "Benin", "BWA": "Botswana", "BFA": "Burkina Faso",
+    "BDI": "Burundi", "CMR": "Cameroon", "CPV": "Cape Verde", "CAF": "Central African Republic",
+    "TCD": "Chad", "COM": "Comoros", "COG": "Congo", "COD": "DR Congo", "CIV": "Ivory Coast",
+    "DJI": "Djibouti", "EGY": "Egypt", "GNQ": "Equatorial Guinea", "ERI": "Eritrea", "SWZ": "Eswatini",
+    "ETH": "Ethiopia", "GAB": "Gabon", "GMB": "Gambia", "GHA": "Ghana", "GIN": "Guinea",
+    "GNB": "Guinea-Bissau", "KEN": "Kenya", "LSO": "Lesotho", "LBR": "Liberia", "LBY": "Libya",
+    "MDG": "Madagascar", "MWI": "Malawi", "MLI": "Mali", "MRT": "Mauritania", "MUS": "Mauritius",
+    "MAR": "Morocco", "MOZ": "Mozambique", "NAM": "Namibia", "NER": "Niger", "NGA": "Nigeria",
+    "RWA": "Rwanda", "STP": "Sao Tome and Principe", "SEN": "Senegal", "SYC": "Seychelles",
+    "SLE": "Sierra Leone", "SOM": "Somalia", "ZAF": "South Africa", "SSD": "South Sudan",
+    "SDN": "Sudan", "TZA": "Tanzania", "TGO": "Togo", "TUN": "Tunisia", "UGA": "Uganda",
+    "ZMB": "Zambia", "ZWE": "Zimbabwe",
+
+    # Americas
+    "ARG": "Argentina", "BHS": "Bahamas", "BRB": "Barbados", "BLZ": "Belize", "BOL": "Bolivia",
+    "BRA": "Brazil", "CAN": "Canada", "CHL": "Chile", "COL": "Colombia", "CRI": "Costa Rica",
+    "CUB": "Cuba", "DMA": "Dominica", "DOM": "Dominican Republic", "ECU": "Ecuador",
+    "SLV": "El Salvador", "GRD": "Grenada", "GTM": "Guatemala", "GUY": "Guyana", "HTI": "Haiti",
+    "HND": "Honduras", "JAM": "Jamaica", "MEX": "Mexico", "NIC": "Nicaragua", "PAN": "Panama",
+    "PRY": "Paraguay", "PER": "Peru", "KNA": "Saint Kitts and Nevis", "LCA": "Saint Lucia",
+    "VCT": "Saint Vincent and the Grenadines", "SUR": "Suriname", "TTO": "Trinidad and Tobago",
+    "USA": "United States", "URY": "Uruguay", "VEN": "Venezuela",
+
+    # Asia
+    "AFG": "Afghanistan", "ARM": "Armenia", "AZE": "Azerbaijan", "BHR": "Bahrain", "BGD": "Bangladesh",
+    "BTN": "Bhutan", "BRN": "Brunei", "KHM": "Cambodia", "CHN": "China", "CYP": "Cyprus",
+    "GEO": "Georgia", "IND": "India", "IDN": "Indonesia", "IRN": "Iran", "IRQ": "Iraq",
+    "ISR": "Israel", "JPN": "Japan", "JOR": "Jordan", "KAZ": "Kazakhstan", "KWT": "Kuwait",
+    "KGZ": "Kyrgyzstan", "LAO": "Laos", "LBN": "Lebanon", "MYS": "Malaysia", "MDV": "Maldives",
+    "MNG": "Mongolia", "MMR": "Myanmar", "NPL": "Nepal", "PRK": "North Korea", "OMN": "Oman",
+    "PAK": "Pakistan", "PSE": "Palestine", "PHL": "Philippines", "QAT": "Qatar", "SAU": "Saudi Arabia",
+    "SGP": "Singapore", "KOR": "South Korea", "LKA": "Sri Lanka", "SYR": "Syria", "TWN": "Taiwan",
+    "TJK": "Tajikistan", "THA": "Thailand", "TLS": "Timor-Leste", "TUR": "Turkey", "TKM": "Turkmenistan",
+    "ARE": "United Arab Emirates", "UZB": "Uzbekistan", "VNM": "Vietnam", "YEM": "Yemen",
+
+    # Europe
+    "ALB": "Albania", "AND": "Andorra", "AUT": "Austria", "BLR": "Belarus", "BEL": "Belgium",
+    "BIH": "Bosnia and Herzegovina", "BGR": "Bulgaria", "HRV": "Croatia", "CZE": "Czech Republic",
+    "DNK": "Denmark", "EST": "Estonia", "FIN": "Finland", "FRA": "France", "DEU": "Germany",
+    "GRC": "Greece", "HUN": "Hungary", "ISL": "Iceland", "IRL": "Ireland", "ITA": "Italy",
+    "XKX": "Kosovo", "LVA": "Latvia", "LIE": "Liechtenstein", "LTU": "Lithuania", "LUX": "Luxembourg",
+    "MLT": "Malta", "MDA": "Moldova", "MCO": "Monaco", "MNE": "Montenegro", "NLD": "Netherlands",
+    "MKD": "North Macedonia", "NOR": "Norway", "POL": "Poland", "PRT": "Portugal", "ROU": "Romania",
+    "RUS": "Russia", "SMR": "San Marino", "SRB": "Serbia", "SVK": "Slovakia", "SVN": "Slovenia",
+    "ESP": "Spain", "SWE": "Sweden", "CHE": "Switzerland", "UKR": "Ukraine", "GBR": "United Kingdom",
+    "VAT": "Vatican City",
+
+    # Oceania
+    "AUS": "Australia", "FJI": "Fiji", "KIR": "Kiribati", "MHL": "Marshall Islands",
+    "FSM": "Micronesia", "NRU": "Nauru", "NZL": "New Zealand", "PLW": "Palau",
+    "PNG": "Papua New Guinea", "WSM": "Samoa", "SLB": "Solomon Islands", "TON": "Tonga",
+    "TUV": "Tuvalu", "VUT": "Vanuatu",
 }

@@ -31,6 +31,21 @@ from app.services.validators.nwt_dl import NWTDriversLicenseValidator
 from app.services.validators.nunavut_dl import NunavutDriversLicenseValidator
 from app.services.validators.yukon_dl import YukonDriversLicenseValidator
 from app.services.validators.canadian_passport import CanadianPassportValidator
+from app.services.validators.us_passport import USPassportValidator
+from app.services.validators.uk_passport import UKPassportValidator
+from app.services.validators.india_passport import IndiaPassportValidator
+from app.services.validators.australia_passport import AustraliaPassportValidator
+from app.services.validators.germany_passport import GermanyPassportValidator
+from app.services.validators.france_passport import FrancePassportValidator
+from app.services.validators.nigeria_passport import NigeriaPassportValidator
+from app.services.validators.china_passport import ChinaPassportValidator
+from app.services.validators.colombia_passport import ColombiaPassportValidator
+from app.services.validators.ukraine_passport import UkrainePassportValidator
+from app.services.validators.generic_passport import GenericPassportValidator
+from app.services.validators.generic_photo_id import GenericPhotoIDValidator
+from app.services.validators.canada_pr_card import CanadaPRCardValidator
+from app.services.validators.california_dl import CaliforniaDriversLicenseValidator
+from app.services.validators.texas_dl import TexasDriversLicenseValidator
 from app.services.validators.us_drivers_license import USDriversLicenseValidator
 from app.services.document_type_detector import DocumentTypeDetector
 
@@ -51,7 +66,7 @@ VALIDATOR_DESCRIPTIONS = {
     "bc_drivers_license": "Validating BC DL: 7-digit format, age (16+ for L, 17+ for N), expiry on birthday, validity period",
     "alberta_drivers_license": "Validating Alberta DL: 9-digit format (XXXXXX-XXX), age (14+ for Learner), expiry on birthday",
     "quebec_drivers_license": "Validating Quebec DL: Letter + 12 digits, name match, age (16+), expiry on birthday",
-    "manitoba_drivers_license": "Validating Manitoba DL: 4 letters + 6 digits (ABCD-123-456), name match, age (16+), expiry on birthday",
+    "manitoba_drivers_license": "Validating Manitoba DL: 9-digit DD/RÉF format, age (16+), expiry on birthday",
     "saskatchewan_drivers_license": "Validating Saskatchewan DL: 8-digit format, age (16+), expiry on birthday",
     "nova_scotia_drivers_license": "Validating Nova Scotia DL: 5 letters + 9 digits, surname prefix, age (16+), expiry on birthday",
     "new_brunswick_drivers_license": "Validating New Brunswick DL: 7-digit format, age (16+), expiry on birthday",
@@ -61,7 +76,25 @@ VALIDATOR_DESCRIPTIONS = {
     "nunavut_drivers_license": "Validating Nunavut DL: 6-digit format, age (15+), expiry on birthday",
     "yukon_drivers_license": "Validating Yukon DL: 6-digit format, age (15+), expiry on birthday",
     "canadian_passport": "Validating Canadian Passport: format (AA123456), validity period (5yr child/10yr adult), age checks",
+    "us_passport": "Validating US Passport: 9-digit format, MRZ country code USA, validity period (5yr child/10yr adult)",
+    "uk_passport": "Validating UK Passport: 9-digit format, MRZ country code GBR, validity period (5yr child/10yr adult)",
+    "india_passport": "Validating India Passport: format (A1234567), MRZ country code IND, validity period (5yr minor/10yr adult)",
+    "australia_passport": "Validating Australia Passport: format (N1234567), MRZ country code AUS, validity period (5yr child/10yr adult)",
+    "germany_passport": "Validating Germany Passport: 9 alphanumeric (no I,O,Q,S), MRZ code DEU, validity (6yr under 24/10yr adult)",
+    "france_passport": "Validating France Passport: format (12AB34567), MRZ country code FRA, validity period (5yr minor/10yr adult)",
+    "nigeria_passport": "Validating Nigeria Passport: format (A12345678), MRZ country code NGA, validity period (5yr 32-page/10yr 64-page)",
+    "china_passport": "Validating China Passport: format (E/G/D + 8 digits), MRZ country code CHN, validity period (5yr minor/10yr adult)",
+    "colombia_passport": "Validating Colombia Passport: format (2 letters + 7 digits), MRZ country code COL, validity period (10 years)",
+    "ukraine_passport": "Validating Ukraine Passport: format (2 letters + 6 digits), MRZ country code UKR, validity period (4yr minor/10yr adult)",
+    "generic_passport": "Validating International Passport: country code verification, document number format, validity period, expiry check",
+    "generic_photo_id": "Validating Photo ID: document number, date validations, validity period, expiry check",
+    "ontario_photo_card": "Validating Ontario Photo Card: document number, date validations, validity period, expiry check",
+    "bc_photo_id": "Validating BC Photo ID: document number, date validations, validity period, expiry check",
+    "alberta_photo_id": "Validating Alberta Photo ID: document number, date validations, validity period, expiry check",
     "us_drivers_license": "Validating US DL: state-specific format, age requirements, validity period, expiry check",
+    "canada_pr_card": "Validating Canada PR Card: format (2 letters + 6 digits), validity period (5 years), expiry check",
+    "california_drivers_license": "Validating California DL: format (1 letter + 7 digits), first letter matches last name, age (16+), expiry on birthday",
+    "texas_drivers_license": "Validating Texas DL: format (8 digits), age (16+), expiry on birthday, validity period (6 years)",
 }
 
 
@@ -138,10 +171,68 @@ class ValidationService:
             DocumentType.YUKON_DRIVERS_LICENSE: [
                 YukonDriversLicenseValidator(),
             ],
-            # Other Documents
+            # Passports
             DocumentType.CANADIAN_PASSPORT: [
                 CanadianPassportValidator(),
             ],
+            DocumentType.US_PASSPORT: [
+                USPassportValidator(),
+            ],
+            DocumentType.UK_PASSPORT: [
+                UKPassportValidator(),
+            ],
+            DocumentType.INDIA_PASSPORT: [
+                IndiaPassportValidator(),
+            ],
+            DocumentType.AUSTRALIA_PASSPORT: [
+                AustraliaPassportValidator(),
+            ],
+            DocumentType.GERMANY_PASSPORT: [
+                GermanyPassportValidator(),
+            ],
+            DocumentType.FRANCE_PASSPORT: [
+                FrancePassportValidator(),
+            ],
+            DocumentType.NIGERIA_PASSPORT: [
+                NigeriaPassportValidator(),
+            ],
+            DocumentType.CHINA_PASSPORT: [
+                ChinaPassportValidator(),
+            ],
+            DocumentType.COLOMBIA_PASSPORT: [
+                ColombiaPassportValidator(),
+            ],
+            DocumentType.UKRAINE_PASSPORT: [
+                UkrainePassportValidator(),
+            ],
+            DocumentType.GENERIC_PASSPORT: [
+                GenericPassportValidator(),
+            ],
+            # Photo Cards / Photo IDs
+            DocumentType.ONTARIO_PHOTO_CARD: [
+                GenericPhotoIDValidator(),
+            ],
+            DocumentType.BC_PHOTO_ID: [
+                GenericPhotoIDValidator(),
+            ],
+            DocumentType.ALBERTA_PHOTO_ID: [
+                GenericPhotoIDValidator(),
+            ],
+            DocumentType.GENERIC_PHOTO_ID: [
+                GenericPhotoIDValidator(),
+            ],
+            # Permanent Residence Cards
+            DocumentType.CANADA_PR_CARD: [
+                CanadaPRCardValidator(),
+            ],
+            # US State Driver's Licenses
+            DocumentType.CALIFORNIA_DRIVERS_LICENSE: [
+                CaliforniaDriversLicenseValidator(),
+            ],
+            DocumentType.TEXAS_DRIVERS_LICENSE: [
+                TexasDriversLicenseValidator(),
+            ],
+            # Other Documents
             DocumentType.US_DRIVERS_LICENSE: [
                 USDriversLicenseValidator(),
             ],
@@ -191,9 +282,10 @@ class ValidationService:
 
         validators = list(self.base_validators)
 
-        # Add document-type specific validators
-        if document_type_info.document_type in self.document_type_validators:
-            type_specific = self.document_type_validators[document_type_info.document_type]
+        # Add document-type specific validators (use document_type_enum for lookup)
+        doc_type_for_lookup = document_type_info.document_type_enum
+        if doc_type_for_lookup and doc_type_for_lookup in self.document_type_validators:
+            type_specific = self.document_type_validators[doc_type_for_lookup]
             validators.extend(type_specific)
             logger.info(
                 f"{log_prefix}   Added {len(type_specific)} {document_type_info.document_name}-specific checks"

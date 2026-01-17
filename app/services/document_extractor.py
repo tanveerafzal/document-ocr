@@ -25,12 +25,16 @@ Return a JSON object with these exact fields:
 - first_name: The person's first/given name
 - last_name: The person's last name/surname/family name
 - full_name: The complete name EXACTLY as shown on the document (preserve original format)
-- document_number: The ID/document/license number
+- document_number: The ID/document/license number or passport number
 - date_of_birth: Date of birth (format as YYYY-MM-DD)
 - issue_date: Document issue date (format as YYYY-MM-DD)
 - expiry_date: Document expiry date (format as YYYY-MM-DD)
 - gender: Gender (M, F, or as shown)
 - address: Full address if present
+- nationality: Nationality or issuing country (e.g., "CANADA", "USA", "UNITED KINGDOM", "INDIA")
+- mrz: Machine Readable Zone - the 2 lines of text at the bottom of passports (if present)
+- country_code: 3-letter country code from MRZ or document (e.g., "CAN", "USA", "GBR", "IND")
+- document_title: The document type text shown on the card (e.g., "PASSPORT", "DRIVER'S LICENCE", "PERMANENT RESIDENT CARD", "HEALTH CARD", "PHOTO CARD")
 
 IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
 - Name format is "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME" (LAST NAME comes FIRST!)
@@ -41,6 +45,52 @@ IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
   - "SMITH JOHN" -> last_name="SMITH", first_name="JOHN"
   - "SMITH, JOHN" -> last_name="SMITH", first_name="JOHN"
   - "NADEEM ASIF" -> last_name="NADEEM", first_name="ASIF"
+
+IMPORTANT for Manitoba Driver's Licence:
+- The document number is labeled "DD/RÉF" on the card (9 digits)
+- Extract the value next to "DD/RÉF" as the document_number
+
+IMPORTANT for British Columbia (BC) Driver's Licence:
+- Document number may have "NDL:" or "DL:" prefix (e.g., NDL:1234567 or DL:1234567)
+- Include the prefix in the document_number if present
+- The number is 7 digits
+
+IMPORTANT for Photo Cards / Photo IDs:
+- Photo Cards are provincial ID cards that are NOT driver's licences
+- Look for text like "Photo Card", "Photo ID", "Identification Card"
+- Extract the province/state name (e.g., "Ontario", "British Columbia", "Alberta")
+- Ontario Photo Card format: Similar to health card
+
+IMPORTANT for Canada Permanent Residence Card (PR Card):
+- Look for text "PERMANENT RESIDENT" or "RÉSIDENT PERMANENT" or "PERMANENT RESIDENT CARD"
+- The card says "CANADA" and "Immigration, Refugees and Citizenship Canada" or "IRCC"
+- Document number format: 2 letters + 6 digits (e.g., RA123456)
+- Set country_code to "CAN" for PR Cards
+- This is NOT a passport - it's a residence card for permanent residents
+
+IMPORTANT for US Driver's Licenses:
+- California DL: 1 letter + 7 digits (e.g., A1234567) - first letter matches last name
+- Texas DL: 8 digits (e.g., 12345678)
+- Look for state name like "STATE OF CALIFORNIA", "STATE OF TEXAS", "DMV", "DPS"
+- Extract the state name (e.g., "California", "Texas", "Florida")
+
+IMPORTANT for Passports:
+- Extract the MRZ (Machine Readable Zone) - the 2 lines of <<< text at the bottom
+- Extract the country code from the MRZ (positions 3-5 of line 1, e.g., "P<CAN" = Canada)
+- Extract the 3-letter ISO country code (e.g., CAN, USA, GBR, IND, AUS, DEU, FRA, NGA, CHN, COL, UKR, MEX, BRA, JPN, KOR, etc.)
+- The country_code field is CRITICAL for passport identification - always extract it from the MRZ
+- Passport number formats vary by country:
+  - Canada: 2 letters + 6 digits (AB123456)
+  - USA: 9 digits
+  - UK: 9 digits
+  - India: 1 letter + 7 digits (A1234567)
+  - Australia: 1-2 letters + 7 digits
+  - Germany: 9 alphanumeric
+  - France: 9 alphanumeric
+  - Nigeria: 1 letter + 8 digits (A12345678)
+  - China: E/G/D + 8 digits (E12345678)
+  - Colombia: 2 letters + 7 digits (CC1234567)
+  - Ukraine: 2 letters + 6 digits (AA123456)
 
 If a field cannot be found or is not visible, use null for that field.
 Return ONLY the JSON object, no additional text or markdown formatting."""
@@ -92,7 +142,11 @@ class DocumentExtractorService:
             "issue_date": None,
             "expiry_date": None,
             "gender": None,
-            "address": None
+            "address": None,
+            "nationality": None,
+            "mrz": None,
+            "country_code": None,
+            "document_title": None
         }
 
         if not image_bytes:
@@ -140,7 +194,8 @@ class DocumentExtractorService:
             # Ensure all expected fields exist
             fields = [
                 "first_name", "last_name", "full_name", "document_number",
-                "date_of_birth", "issue_date", "expiry_date", "gender", "address"
+                "date_of_birth", "issue_date", "expiry_date", "gender", "address",
+                "nationality", "mrz", "country_code", "document_title"
             ]
             for field in fields:
                 if field not in extracted_data:

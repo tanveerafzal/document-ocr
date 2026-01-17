@@ -11,8 +11,7 @@ class ManitobaDriversLicenseValidator(BaseValidator):
     Validate Manitoba Driver's Licence specific requirements.
 
     Manitoba DL specifics:
-    - Licence number format: 4 letters + 6 digits (e.g., ABCD-123-456 or ABCD123456)
-    - First 2 letters typically relate to last name
+    - Document number (DD/RÉF): 9 digits
     - Name format on licence: "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME"
     - Licence classes: Class 5L (Learner), Class 5I (Intermediate), Class 5F (Full)
     - Minimum age: 16 for Class 5L Learner
@@ -68,55 +67,33 @@ class ManitobaDriversLicenseValidator(BaseValidator):
         expiry_date = document_data.get("expiry_date")
         issue_date_str = document_data.get("issue_date")
 
-        # Check 1: Licence number format (4 letters + 6 digits: ABCD-123-456)
-        details["checks_performed"].append("licence_number_format")
-        raw_number = document_number.strip().upper()
+        # Check 1: Document number format (DD/RÉF) - 9 digits
+        details["checks_performed"].append("document_number_format")
+        raw_number = document_number.strip()
 
-        # Remove hyphens and spaces
-        clean_number = re.sub(r"[\s\-]", "", raw_number)
+        # Remove hyphens, spaces, and other separators
+        clean_number = re.sub(r"[\s\-/]", "", raw_number)
 
-        # Manitoba format: 4 letters + 6 digits = 10 characters total
-        manitoba_format = r"^[A-Z]{4}\d{6}$"
+        # Manitoba format: 9 digits
+        manitoba_format = r"^\d{9}$"
 
         if not clean_number:
-            issues.append("Missing licence number")
+            issues.append("Missing document number (DD/RÉF)")
         elif re.match(manitoba_format, clean_number):
-            details["licence_number_valid"] = True
-            details["licence_letters"] = clean_number[:4]
-            details["licence_digits"] = clean_number[4:]
-        elif len(clean_number) == 10 and clean_number[:4].isalpha():
+            details["document_number_valid"] = True
+        elif clean_number.isdigit() and 7 <= len(clean_number) <= 10:
             # Close to valid format
             warnings.append(
-                f"Licence number '{document_number}' may have format issues. "
-                "Manitoba licence: 4 letters + 6 digits (e.g., ABCD-123-456)"
+                f"Document number '{document_number}' has {len(clean_number)} digits. "
+                "Manitoba DD/RÉF is typically 9 digits."
             )
-            details["licence_letters"] = clean_number[:4]
         else:
             issues.append(
-                f"Invalid Manitoba licence format. Expected: 4 letters + 6 digits (e.g., ABCD-123-456), "
+                f"Invalid Manitoba document number format. Expected: 9 digits, "
                 f"Got: {document_number}"
             )
 
-        details["clean_licence_number"] = clean_number
-
-        # Check 2: First letters may relate to last name
-        details["checks_performed"].append("letter_name_check")
-        if clean_number and len(clean_number) >= 2 and clean_number[:2].isalpha():
-            licence_prefix = clean_number[:2].upper()
-            details["licence_prefix"] = licence_prefix
-
-            if last_name:
-                last_name_initial = last_name[0].upper()
-                details["last_name_initial"] = last_name_initial
-
-                # Manitoba DL first letter often matches last name
-                if licence_prefix[0] != last_name_initial:
-                    warnings.append(
-                        f"Licence prefix '{licence_prefix}' may not match "
-                        f"last name initial '{last_name_initial}'"
-                    )
-                else:
-                    details["prefix_matches_name"] = True
+        details["clean_document_number"] = clean_number
 
         # Check 3: Minimum age for Manitoba DL (16 for Class 5L Learner)
         details["checks_performed"].append("minimum_age_manitoba")
