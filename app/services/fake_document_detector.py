@@ -44,6 +44,9 @@ class FakeDocumentDetector:
         ("james", "public"), ("jane", "public"),  # Common Canadian specimen names
         ("james", "quintin"), ("quintin", "public"),
 
+        # Ontario Health Card specimen name
+        ("anita", "walker"), ("anita", "jean"), ("jean", "walker"),
+
         # Generic placeholders
         ("your", "name"), ("full", "name"), ("given", "name"),
         ("name", "here"), ("insert", "name"),
@@ -88,6 +91,8 @@ class FakeDocumentDetector:
         "AB123456", "CD123456", "XY123456",
         "A1234567", "B1234567", "L1234567",
         "123456789", "000000000", "999999999",
+        "1234567890",  # Ontario Health Card specimen
+        "5584486674",  # Ontario Health Card specimen (Anita Walker)
         "S1234567", "P1234567", "T1234567",
         "SPECIMEN", "SAMPLE", "TEST",
     ]
