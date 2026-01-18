@@ -31,10 +31,12 @@ Return a JSON object with these exact fields:
 - expiry_date: Document expiry date (format as YYYY-MM-DD)
 - gender: Gender (M, F, or as shown)
 - address: Full address if present
-- nationality: Nationality or issuing country (e.g., "CANADA", "USA", "UNITED KINGDOM", "INDIA")
+- nationality: The holder's nationality as shown on document (e.g., "INDIA", "CHINA", "CANADIAN")
 - mrz: Machine Readable Zone - the 2 lines of text at the bottom of passports (if present)
-- country_code: 3-letter country code from MRZ or document (e.g., "CAN", "USA", "GBR", "IND")
-- document_title: The document type text shown on the card (e.g., "PASSPORT", "DRIVER'S LICENCE", "PERMANENT RESIDENT CARD", "HEALTH CARD", "PHOTO CARD")
+- country_code: 3-letter code of the ISSUING COUNTRY (e.g., "CAN" for Canadian documents, "USA" for US documents)
+- document_title: The document type text shown on the card (e.g., "PASSPORT", "DRIVER'S LICENCE", "PERMANENT RESIDENT CARD", "HEALTH CARD")
+
+NOTE: For PR Cards, the holder's nationality (e.g., IND) is DIFFERENT from the issuing country (CAN). Always set country_code based on the ISSUING country, not the holder's nationality.
 
 IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
 - Name format is "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME" (LAST NAME comes FIRST!)
@@ -70,10 +72,13 @@ IMPORTANT for Photo Cards / Photo IDs:
 
 IMPORTANT for Canada Permanent Residence Card (PR Card):
 - Look for text "PERMANENT RESIDENT" or "RÉSIDENT PERMANENT" or "PERMANENT RESIDENT CARD"
-- The card says "CANADA" and "Immigration, Refugees and Citizenship Canada" or "IRCC"
-- Document number format: 2 letters + 6 digits (e.g., RA123456)
-- Set country_code to "CAN" for PR Cards
-- This is NOT a passport - it's a residence card for permanent residents
+- The card says "CANADA" and "Government of Canada / Gouvernement du Canada"
+- Set document_title to "PERMANENT RESIDENT CARD"
+- Document number format: The "ID No/N° ID" field contains digits with dashes (e.g., 11-3360-6084)
+- CRITICAL: Set country_code to "CAN" (issuing country is CANADA)
+- The "Nationality/Nationalité" field shows the holder's nationality (e.g., IND, CHN, PAK)
+- Do NOT use the nationality field as country_code - PR Cards are ALWAYS issued by CANADA
+- This is NOT a passport - it's a Canadian residence card for permanent residents
 
 IMPORTANT for US Driver's Licenses:
 - California DL: 1 letter + 7 digits (e.g., A1234567) - first letter matches last name

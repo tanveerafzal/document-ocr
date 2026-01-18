@@ -27,7 +27,8 @@ class DocumentTypeDetector:
     PR_CARD_KEYWORDS = [
         "permanent resident", "permanent residence", "résident permanent",
         "pr card", "carte rp", "carte de résident", "resident card",
-        "immigration, refugees", "ircc", "immigration canada"
+        "immigration, refugees", "ircc", "immigration canada",
+        "government of canada", "gouvernement du canada"  # PR cards show this header
     ]
 
     # Province mappings
@@ -36,6 +37,7 @@ class DocumentTypeDetector:
         "british columbia": "British Columbia",
         "alberta": "Alberta",
         "quebec": "Quebec",
+        "québec": "quebec",  # French spelling with accent
         "manitoba": "Manitoba",
         "saskatchewan": "Saskatchewan",
         "nova scotia": "Nova Scotia",
@@ -51,7 +53,8 @@ class DocumentTypeDetector:
         " on ": "ontario", ", on": "ontario", "on,": "ontario", "ont": "ontario",
         " bc ": "british columbia", ", bc": "british columbia", "b.c.": "british columbia",
         " ab ": "alberta", ", ab": "alberta", "alta": "alberta",
-        " qc ": "quebec", ", qc": "quebec", "que": "quebec",
+        " qc ": "quebec", ", qc": "quebec", "(qc)": "quebec", "que": "quebec",
+        "permis de conduire": "quebec",  # Quebec-specific French text
         " mb ": "manitoba", ", mb": "manitoba",
         " sk ": "saskatchewan", ", sk": "saskatchewan", "sask": "saskatchewan",
         " ns ": "nova scotia", ", ns": "nova scotia",
@@ -284,10 +287,13 @@ class DocumentTypeDetector:
         detected_us_state = cls._detect_us_state(full_text_lower)
 
         # Detect country (check for Canada indicators)
+        # Note: PR cards may have nationality (e.g., IND) as country_code, but are still Canadian documents
+        has_government_of_canada = "government of canada" in full_text_lower or "gouvernement du canada" in full_text_lower
         is_canada = (
             "canada" in full_text_lower or
             country_code == "CAN" or
-            detected_province is not None
+            detected_province is not None or
+            has_government_of_canada
         )
 
         # Detect US indicators
@@ -550,9 +556,14 @@ class DocumentTypeDetector:
     @classmethod
     def _detect_province(cls, full_text_lower: str) -> Optional[str]:
         """Detect Canadian province from text."""
-        for province in cls.PROVINCE_MAPPING.keys():
-            if province in full_text_lower:
-                return province
+        # Check full province names
+        for province_key in cls.PROVINCE_MAPPING.keys():
+            if province_key in full_text_lower:
+                # Normalize accented names to base name (e.g., "québec" -> "quebec")
+                if province_key == "québec":
+                    return "quebec"
+                return province_key
+        # Check abbreviations
         for abbrev, province in cls.PROVINCE_ABBREV.items():
             if abbrev in full_text_lower:
                 return province

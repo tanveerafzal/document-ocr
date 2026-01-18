@@ -11,7 +11,7 @@ class ColombiaPassportValidator(BaseValidator):
     Validate Colombia Passport specific requirements.
 
     Colombia Passport specifics:
-    - Passport number format: 2 letters + 7 digits (e.g., CC1234567)
+    - Passport number format: 2 letters + 6-7 digits (e.g., AZ573250 or CC1234567)
     - MRZ country code: COL
     - Validity period: 10 years for all ages
     - Issue date must be after date of birth
@@ -42,24 +42,24 @@ class ColombiaPassportValidator(BaseValidator):
         elif country_code:
             details["country_code_verified"] = True
 
-        # Check 2: Passport number format (2 letters + 7 digits)
+        # Check 2: Passport number format (2 letters + 6-7 digits)
         details["checks_performed"].append("passport_number_format")
         clean_number = re.sub(r"[\s\-]", "", document_number.strip().upper())
 
-        # Colombia passport: 2 letters + 7 digits
-        colombia_passport_format = r"^[A-Z]{2}\d{7}$"
+        # Colombia passport: 2 letters + 6-7 digits (e.g., AZ573250 or CC1234567)
+        colombia_passport_format = r"^[A-Z]{2}\d{6,7}$"
 
         if not clean_number:
             issues.append("Missing passport number")
         elif not re.match(colombia_passport_format, clean_number):
-            if len(clean_number) == 9 and clean_number[:2].isalpha():
+            if len(clean_number) in [8, 9] and clean_number[:2].isalpha():
                 warnings.append(
                     f"Passport number '{document_number}' may have format issues. "
-                    "Colombia passport: 2 letters + 7 digits (e.g., CC1234567)"
+                    "Colombia passport: 2 letters + 6-7 digits (e.g., AZ573250)"
                 )
             else:
                 issues.append(
-                    f"Invalid Colombia passport format. Expected: 2 letters + 7 digits (e.g., CC1234567), "
+                    f"Invalid Colombia passport format. Expected: 2 letters + 6-7 digits (e.g., AZ573250), "
                     f"Got: {document_number}"
                 )
         else:
