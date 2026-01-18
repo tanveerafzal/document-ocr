@@ -84,7 +84,18 @@ def process_single_file(image_file: Path, api_url: str, api_key: str, counter: C
         output_path = save_result(image_file, result)
 
         with print_lock:
-            if result.get("success"):
+            # Check if fake document detected
+            fake_detection = result.get("fake_detection", {})
+            is_fake = fake_detection.get("is_fake", False)
+
+            if is_fake:
+                print(f"\n{'*' * 50}")
+                print(f"*** FAKE DOCUMENT *** {image_file.name}")
+                print(f"{'*' * 50}")
+                print(f"Reasons: {fake_detection.get('reasons', [])}")
+                print()
+                counter.add_fail(image_file.name, "FAKE_DOCUMENT")
+            elif result.get("success"):
                 counter.add_success()
                 print(f"[OK] {image_file.name}")
             else:
@@ -113,7 +124,7 @@ def process_single_file(image_file: Path, api_url: str, api_key: str, counter: C
         return None
 
 
-def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: int = 1):
+def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: int = 3):
     """
     Process all documents in a folder with optional concurrency.
     """
