@@ -104,8 +104,8 @@ class FakeDocumentDetector:
         "0001-01-01", "9999-12-31",
     ]
 
-    # Suspicious birth years for specimens
-    SUSPICIOUS_BIRTH_YEARS = [1900, 1901, 1911, 1970, 1980, 2000]
+    # Suspicious birth years for specimens (only very old/placeholder years)
+    SUSPICIOUS_BIRTH_YEARS = [1900, 1901, 1911]
 
     # Fake/placeholder address indicators
     FAKE_ADDRESS_PATTERNS = [
@@ -249,11 +249,15 @@ class FakeDocumentDetector:
                 break
 
         # Check for repeated characters in names (e.g., "AAAA BBBB")
-        if first_name and len(set(first_name.replace(" ", ""))) <= 2:
+        # Only flag if name is 4+ chars AND has 2 or fewer unique chars
+        # This avoids false positives on short names like "YU", "LI", "WU"
+        first_name_clean = first_name.replace(" ", "")
+        if first_name_clean and len(first_name_clean) >= 4 and len(set(first_name_clean)) <= 2:
             score += 0.5
             reasons.append(f"Suspicious first name: '{first_name}' (repeated characters)")
 
-        if last_name and len(set(last_name.replace(" ", ""))) <= 2:
+        last_name_clean = last_name.replace(" ", "")
+        if last_name_clean and len(last_name_clean) >= 4 and len(set(last_name_clean)) <= 2:
             score += 0.5
             reasons.append(f"Suspicious last name: '{last_name}' (repeated characters)")
 

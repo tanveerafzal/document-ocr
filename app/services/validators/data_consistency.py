@@ -48,11 +48,9 @@ class DataConsistencyValidator(BaseValidator):
                 if validity_years > 50:
                     issues.append(f"Unusual document validity period: {validity_years} years")
 
-            # Check: Document shouldn't be issued to someone under 14
-            if dob and issue_date:
-                age_at_issue = (issue_date - dob).days // 365
-                if age_at_issue < 14:
-                    issues.append(f"Document issued when holder was only {age_at_issue} years old")
+            # Note: We do NOT check minimum age at issue because:
+            # - Passports can be issued to children of any age (including newborns)
+            # - Driver's licenses have their own age validation in specific validators
 
         except Exception as e:
             issues.append(f"Date parsing error: {str(e)}")

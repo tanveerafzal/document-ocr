@@ -16,7 +16,7 @@ REQUIRED_FIELDS = ["first_name", "last_name", "document_number", "date_of_birth"
 #   - claude-3-sonnet-20240229   (better quality)
 #   - claude-3-5-sonnet-20241022 (recommended for better accuracy)
 #   - claude-3-opus-20240229     (best quality, slowest, most expensive)
-CLAUDE_MODEL = os.environ.get("CLAUDE_VISION_MODEL", "claude-3-haiku-20240307")
+CLAUDE_MODEL = os.environ.get("CLAUDE_VISION_MODEL", "claude-3-5-sonnet-20241022")
 logger.info(f"Document extraction using Claude model: {CLAUDE_MODEL}")
 
 VISION_PROMPT = """Analyze this identity document image and extract the following fields.
@@ -31,10 +31,12 @@ Return a JSON object with these exact fields:
 - expiry_date: Document expiry date (format as YYYY-MM-DD)
 - gender: Gender (M, F, or as shown)
 - address: Full address if present
-- nationality: Nationality or issuing country (e.g., "CANADA", "USA", "UNITED KINGDOM", "INDIA")
+- nationality: The holder's nationality as shown on document (e.g., "INDIA", "CHINA", "CANADIAN")
 - mrz: Machine Readable Zone - the 2 lines of text at the bottom of passports (if present)
-- country_code: 3-letter country code from MRZ or document (e.g., "CAN", "USA", "GBR", "IND")
-- document_title: The document type text shown on the card (e.g., "PASSPORT", "DRIVER'S LICENCE", "PERMANENT RESIDENT CARD", "HEALTH CARD", "PHOTO CARD")
+- country_code: 3-letter code of the ISSUING COUNTRY (e.g., "CAN" for Canadian documents, "USA" for US documents)
+- document_title: The document type text shown on the card (e.g., "PASSPORT", "DRIVER'S LICENCE", "PERMANENT RESIDENT CARD", "HEALTH CARD")
+
+NOTE: For PR Cards, the holder's nationality (e.g., IND) is DIFFERENT from the issuing country (CAN). Always set country_code based on the ISSUING country, not the holder's nationality.
 
 IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
 - Name format is "LASTNAME FIRSTNAME" or "LASTNAME, FIRSTNAME" (LAST NAME comes FIRST!)
@@ -44,7 +46,14 @@ IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
 - Examples:
   - "SMITH JOHN" -> last_name="SMITH", first_name="JOHN"
   - "SMITH, JOHN" -> last_name="SMITH", first_name="JOHN"
-  - "NADEEM ASIF" -> last_name="NADEEM", first_name="ASIF"
+
+CRITICAL for Ontario Driver's Licence Name Verification:
+- The license number FIRST LETTER must match the LAST NAME initial
+- Use this to VERIFY you extracted the name correctly
+- Example: If license is "A3060-73207-31206", the last name MUST start with 'A'
+- If you extracted last_name="TANVER" but license starts with 'A', you made an error!
+- Re-read the NAME/NOM field carefully - the FIRST line/word is the LAST NAME
+- Common OCR errors: AFZAL misread as ASIF, carefully distinguish F/S, Z/S, A/4, L/I
 
 IMPORTANT for Manitoba Driver's Licence:
 - The document number is labeled "DD/RÉF" on the card (9 digits)
@@ -63,10 +72,13 @@ IMPORTANT for Photo Cards / Photo IDs:
 
 IMPORTANT for Canada Permanent Residence Card (PR Card):
 - Look for text "PERMANENT RESIDENT" or "RÉSIDENT PERMANENT" or "PERMANENT RESIDENT CARD"
-- The card says "CANADA" and "Immigration, Refugees and Citizenship Canada" or "IRCC"
-- Document number format: 2 letters + 6 digits (e.g., RA123456)
-- Set country_code to "CAN" for PR Cards
-- This is NOT a passport - it's a residence card for permanent residents
+- The card says "CANADA" and "Government of Canada / Gouvernement du Canada"
+- Set document_title to "PERMANENT RESIDENT CARD"
+- Document number format: The "ID No/N° ID" field contains digits with dashes (e.g., 11-3360-6084)
+- CRITICAL: Set country_code to "CAN" (issuing country is CANADA)
+- The "Nationality/Nationalité" field shows the holder's nationality (e.g., IND, CHN, PAK)
+- Do NOT use the nationality field as country_code - PR Cards are ALWAYS issued by CANADA
+- This is NOT a passport - it's a Canadian residence card for permanent residents
 
 IMPORTANT for US Driver's Licenses:
 - California DL: 1 letter + 7 digits (e.g., A1234567) - first letter matches last name
@@ -79,6 +91,34 @@ IMPORTANT for Passports:
 - Extract the country code from the MRZ (positions 3-5 of line 1, e.g., "P<CAN" = Canada)
 - Extract the 3-letter ISO country code (e.g., CAN, USA, GBR, IND, AUS, DEU, FRA, NGA, CHN, COL, UKR, MEX, BRA, JPN, KOR, etc.)
 - Some passports (e.g., Indian) show "Code" instead of "Country Code" - extract from this field as well
+
+IMPORTANT for Canadian Passports:
+- Look for "Surname/Nom" field - this is the LAST NAME (family name)
+- Look for "Given names/Prénoms" field - this is the FIRST NAME (given name)
+- CRITICAL: Surname = LAST NAME, Given names = FIRST NAME (do NOT swap them!)
+- The MRZ format is: P<CAN + LASTNAME + << + FIRSTNAME + <<<...
+- Example: "P<CANASIF<<WALEED" means last_name="ASIF", first_name="WALEED"
+- Do NOT confuse with driver's licence format - passports have clearly labeled fields
+- Extract the passport number from "Passport No./N° de passeport" field (format: 2 letters + 6 digits, e.g., AT878816)
+
+CRITICAL for Canadian Passport DATES:
+- Date format on card: "DD MONTH/MOIS YY" (e.g., "14 MAY/MAI 13" = May 14, 2013)
+- The 2-digit year should be interpreted as 20XX for recent passports
+- Example: "14 MAY/MAI 13" means 2013-05-14, NOT 1913 or 1973
+- VERIFY dates using MRZ Line 2: format is YYMMDD (e.g., "130514" = 2013-05-14)
+- If card shows year "13" and MRZ shows "130514", the date is 2013-05-14
+
+CRITICAL - MRZ Verification (for Passports):
+- ALWAYS cross-check extracted data against the MRZ (Machine Readable Zone) at the bottom
+- The MRZ is the authoritative source - it's machine-readable and more accurate
+- MRZ Line 1 format: P<COUNTRY_CODE + LASTNAME + << + FIRSTNAME + <<<...
+- MRZ Line 2 format: PASSPORT_NUMBER + < + CHECK_DIGIT + COUNTRY + DOB + ...
+- Name verification: If printed text shows "WALED" but MRZ shows "WALEED", use "WALEED"
+- Passport number verification: The passport number appears at the START of MRZ line 2
+  - Example: "AT878816<1CAN..." means passport number is "AT878816"
+  - If printed text shows "AT87881G" but MRZ shows "AT878816", use "AT878816"
+- Double letters are common - verify carefully (e.g., WALEED has two E's, MOHAMMED has two M's)
+- Numbers 0/O and 1/I can be confused - use MRZ to verify
 - If the MRZ shows "P<IND" or document shows "Code: IND" or "INDIA", set country_code to "IND"
 - The country_code field is CRITICAL for passport identification - always extract it from the MRZ or Code field
 - If document shows "Passport No" or "Passport Number", it is definitely a passport
