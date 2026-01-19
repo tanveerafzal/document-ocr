@@ -9,15 +9,23 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_FIELDS = ["first_name", "last_name", "document_number", "date_of_birth", "expiry_date"]
 
-# Claude model for document extraction - configurable via environment variable
+# Claude models for document extraction - configurable via environment variables
 # Options (in order of quality/cost):
-#   - claude-3-haiku-20240307    (fastest, cheapest - default)
+#   - claude-3-haiku-20240307    (fastest, cheapest)
 #   - claude-3-5-haiku-20241022  (faster haiku, good quality)
 #   - claude-3-sonnet-20240229   (better quality)
-#   - claude-3-5-sonnet-20241022 (recommended for better accuracy)
-#   - claude-3-opus-20240229     (best quality, slowest, most expensive)
-CLAUDE_MODEL = os.environ.get("CLAUDE_VISION_MODEL", "claude-3-5-sonnet-20241022")
-logger.info(f"Document extraction using Claude model: {CLAUDE_MODEL}")
+#   - claude-3-5-sonnet-20241022 (good balance of speed/accuracy)
+#   - claude-sonnet-4-20250514   (newer sonnet, recommended)
+#   - claude-opus-4-20250514     (opus 4)
+#   - claude-opus-4-5-20251101   (opus 4.5 - best quality)
+
+# Model for mobile devices (better camera quality = can use cheaper model)
+# Also used as default when device type is not specified
+CLAUDE_MODEL_MOBILE = os.environ.get("CLAUDE_VISION_MODEL_MOBILE", "claude-sonnet-4-20250514")
+# Model for desktop devices (worse camera quality = need expensive model for accuracy)
+CLAUDE_MODEL_DESKTOP = os.environ.get("CLAUDE_VISION_MODEL_DESKTOP", "claude-opus-4-20250514")
+
+logger.info(f"Document extraction models - Mobile/Default: {CLAUDE_MODEL_MOBILE}, Desktop: {CLAUDE_MODEL_DESKTOP}")
 
 VISION_PROMPT = """Analyze this identity document image and extract the following fields.
 
@@ -63,6 +71,22 @@ IMPORTANT for British Columbia (BC) Driver's Licence:
 - Document number may have "NDL:" or "DL:" prefix (e.g., NDL:1234567 or DL:1234567)
 - Include the prefix in the document_number if present
 - The number is 7 digits
+
+IMPORTANT for Ontario Health Card:
+- Look for "Health • Santé" text and butterfly logo - this indicates Ontario Health Card
+- Document number format: XXXX-XXX-XXX-XX (4 digits, 3 digits, 3 digits, 2 letters)
+- Example: 2784-664-928-PG (NOT 828-PQ - watch for 9/8 and G/Q confusion)
+- The card has THREE date rows:
+  - Row 1: Date of Birth (DOB) - format: YYYY-MM-DD (e.g., 1973-12-06)
+  - Row 2: Issue Date (left) and Expiry Date (right) - BOTH on same row
+  - Issue date is on the LEFT, Expiry date is on the RIGHT
+- CRITICAL: Years are 4 digits (2025, 2030) - NOT 2-digit years like 08 or 09
+- If you see "2025-11-04" and "2030-12-06", those are issue and expiry dates
+- Common errors to avoid:
+  - Reading 9 as 8 (e.g., 928 misread as 828)
+  - Reading G as Q (e.g., PG misread as PQ)
+  - Reading 2025 as 2008 or 2030 as 2009
+- Set country_code to "CAN" and document_title to "HEALTH CARD"
 
 IMPORTANT for Photo Cards / Photo IDs:
 - Photo Cards are provincial ID cards that are NOT driver's licences
@@ -166,13 +190,16 @@ class DocumentExtractorService:
         return len(missing) == 0, missing
 
     @classmethod
-    def extract_from_image(cls, image_bytes: bytes, media_type: str = "image/png") -> Tuple[dict, bool, List[str]]:
+    def extract_from_image(cls, image_bytes: bytes, media_type: str = "image/png", device_type: str = None) -> Tuple[dict, bool, List[str]]:
         """
         Extract document fields directly from image using Claude Vision.
 
         Args:
             image_bytes: Raw image bytes
             media_type: MIME type (image/png, image/jpeg, image/webp, image/gif)
+            device_type: Device type ('mobile' or 'desktop') for model selection.
+                        Mobile devices have better cameras so use cheaper model.
+                        Desktop devices have worse cameras so use expensive model.
 
         Returns a tuple of (extracted_data, is_valid, missing_fields).
         """
@@ -200,9 +227,19 @@ class DocumentExtractorService:
         # Encode image to base64
         image_base64 = base64.standard_b64encode(image_bytes).decode("utf-8")
 
+        # Select model based on device type (default to mobile if not specified)
+        if device_type == "desktop":
+            selected_model = CLAUDE_MODEL_DESKTOP
+        else:
+            # Mobile or unspecified defaults to mobile model
+            selected_model = CLAUDE_MODEL_MOBILE
+
+        effective_device_type = device_type or "mobile (default)"
+        logger.info(f"Using Claude model '{selected_model}' for device type '{effective_device_type}'")
+
         try:
             response = client.messages.create(
-                model=CLAUDE_MODEL,
+                model=selected_model,
                 max_tokens=1000,
                 messages=[
                     {
