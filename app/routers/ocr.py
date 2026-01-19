@@ -178,6 +178,11 @@ async def extract_document_from_image(
         ge=1,
         le=120,
         description="Minimum age requirement for age validation"
+    ),
+    device_type: Optional[str] = Query(
+        default=None,
+        alias="deviceType",
+        description="Device type ('mobile' or 'desktop') for model selection. Mobile uses cheaper model, desktop uses expensive model for better accuracy."
     )
 ) -> Union[DocumentExtractResponse, DocumentValidationResponse]:
     """
@@ -258,10 +263,12 @@ async def extract_document_from_image(
                 image_bytes = output.getvalue()
 
         logger.info(f"[{request_id}]   Detected format: {detected_format}")
+        logger.info(f"[{request_id}]   Device type: {device_type or 'not specified'}")
 
         extracted_fields, is_valid, missing_fields = DocumentExtractorService.extract_from_image(
             image_bytes,
-            media_type=media_type
+            media_type=media_type,
+            device_type=device_type
         )
 
         # Run fake document detection
