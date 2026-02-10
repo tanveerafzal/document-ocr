@@ -124,7 +124,7 @@ def process_single_file(image_file: Path, api_url: str, api_key: str, counter: C
         return None
 
 
-def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: int = 3):
+def process_folder(folder_path: str, api_url: str, api_key: str, concurrency: int = 1):
     """
     Process all documents in a folder with optional concurrency.
     """
