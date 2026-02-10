@@ -156,3 +156,13 @@ If any required field is missing, `success` will be `false` and `missing_fields`
 ## Cost
 
 Uses Claude 3 Haiku Vision: ~$0.0005 per document (~$15/month for 1,000 docs/day)
+
+Claude Models
+Most Expensive: claude-opus-4-5-20251101
+export CLAUDE_VISION_MODEL_MOBILE="claude-sonnet-4-5-20250929"
+export CLAUDE_VISION_MODEL_DESKTOP="claude-opus-4-5-20251101"
+
+
+local deployment
+$env:CLAUDE_VISION_MODEL_MOBILE="claude-sonnet-4-20250514"
+$env:CLAUDE_VISION_MODEL_DESKTOP="claude-opus-4-5-20251101"

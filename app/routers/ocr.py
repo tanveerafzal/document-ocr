@@ -17,6 +17,15 @@ from app.models.responses import (
     DocumentValidationResponse,
     DocumentTypeResult,
     FakeDocumentResult,
+    DocumentIntegrityResult,
+    IntegrityTestResponse,
+    ClaudeAnalysisResult,
+    ClaudeAnalysisSummary,
+    ClaudeAnalysisIssue,
+    ClaudeSpecimenDocumentAnalysis,
+    ClaudePhotoTamperingAnalysis,
+    ClaudeScreenCaptureAnalysis,
+    ClaudeOverallAssessment,
     ValidationStatus,
 )
 from app.services.image_ocr import ImageOCRService
@@ -24,6 +33,7 @@ from app.services.pdf_ocr import PDFOCRService
 from app.services.document_extractor import DocumentExtractorService
 from app.services.validation_service import ValidationService
 from app.services.fake_document_detector import FakeDocumentDetector
+from app.services.claude_integrity_analyzer import ClaudeIntegrityAnalyzer
 from app.auth import verify_api_key
 
 # Configure logging
@@ -283,6 +293,24 @@ async def extract_document_from_image(
         if fake_detection.is_fake:
             logger.warning(f"[{request_id}]   FAKE DOCUMENT DETECTED: {fake_detection.reasons}")
 
+        # Calculate overall document integrity
+        # Note: For photo tampering and print attack detection, use the /ocr/test/integrity
+        # endpoint with Claude Vision analysis which is more accurate
+        integrity_issues = []
+        if fake_detection.is_fake:
+            integrity_issues.append("fake_document")
+
+        # Integrity score: 1.0 means fully valid, lower scores indicate issues
+        integrity_score = 1.0
+        integrity_score -= fake_detection.confidence
+        integrity_score = max(0.0, integrity_score)
+
+        document_integrity = DocumentIntegrityResult(
+            is_valid=len(integrity_issues) == 0,
+            fake_detection=fake_detection,
+            integrity_score=round(integrity_score, 2)
+        )
+
         # Run validation if requested
         validation_summary = None
         validation_results = None
@@ -297,9 +325,12 @@ async def extract_document_from_image(
         processing_time = time.time() - start_time
 
         # Determine overall success
+        # Document must pass extraction, integrity checks (not fake, not printed, not tampered)
+        integrity_passed = document_integrity.is_valid
+
         if validate:
-            # With validation: success requires extraction, validation to pass, and not fake
-            overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED and not fake_detection.is_fake
+            # With validation: success requires extraction, validation to pass, and integrity checks
+            overall_success = is_valid and validation_summary.overall_status != ValidationStatus.FAILED and integrity_passed
 
             # Build document type result
             doc_type_result = None
@@ -311,6 +342,13 @@ async def extract_document_from_image(
                     country=document_type_info.country,
                     state_province=document_type_info.state_province
                 )
+
+            # Build error message
+            error_msg = None
+            if not is_valid:
+                error_msg = f"Could not extract required fields: {', '.join(missing_fields)}"
+            elif not integrity_passed:
+                error_msg = f"Document integrity check failed: {', '.join(integrity_issues)}"
 
             response = DocumentValidationResponse(
                 success=overall_success,
@@ -326,14 +364,23 @@ async def extract_document_from_image(
                 address=extracted_fields.get("address"),
                 missing_fields=missing_fields if not is_valid else None,
                 fake_detection=fake_detection,
+                document_integrity=document_integrity,
                 validation_summary=validation_summary,
                 validation_results=validation_results,
                 processing_time_seconds=round(processing_time, 3),
-                error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
+                error=error_msg
             )
         else:
-            # Without validation: success requires extraction and not fake
-            overall_success = is_valid and not fake_detection.is_fake
+            # Without validation: success requires extraction and integrity checks
+            overall_success = is_valid and integrity_passed
+
+            # Build error message
+            error_msg = None
+            if not is_valid:
+                error_msg = f"Could not extract required fields: {', '.join(missing_fields)}"
+            elif not integrity_passed:
+                error_msg = f"Document integrity check failed: {', '.join(integrity_issues)}"
+
             response = DocumentExtractResponse(
                 success=overall_success,
                 first_name=extracted_fields.get("first_name"),
@@ -347,8 +394,9 @@ async def extract_document_from_image(
                 address=extracted_fields.get("address"),
                 missing_fields=missing_fields if not is_valid else None,
                 fake_detection=fake_detection,
+                document_integrity=document_integrity,
                 processing_time_seconds=round(processing_time, 3),
-                error=f"Could not extract required fields: {', '.join(missing_fields)}" if not is_valid else None
+                error=error_msg
             )
 
         # Log response
@@ -358,9 +406,12 @@ async def extract_document_from_image(
         logger.info(f"[{request_id}]   Doc#: {response.document_number}")
         logger.info(f"[{request_id}]   DOB: {response.date_of_birth}")
         logger.info(f"[{request_id}]   Fake Detection: is_fake={fake_detection.is_fake}, confidence={fake_detection.confidence}")
+        logger.info(f"[{request_id}]   Document Integrity: is_valid={document_integrity.is_valid}, score={document_integrity.integrity_score}")
         logger.info(f"[{request_id}]   Processing time: {response.processing_time_seconds}s")
         if not is_valid:
             logger.info(f"[{request_id}]   Missing fields: {missing_fields}")
+        if not integrity_passed:
+            logger.info(f"[{request_id}]   Integrity issues: {integrity_issues}")
 
         return response
 
@@ -476,3 +527,225 @@ async def convert_pdf_to_image(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF conversion failed: {str(e)}")
+
+
+@router.post("/test/integrity", response_model=IntegrityTestResponse)
+async def test_document_integrity(
+    request: Request,
+    file: UploadFile = File(...)
+) -> IntegrityTestResponse:
+    """
+    Test endpoint for document integrity detection using Claude Vision AI.
+
+    This endpoint analyzes document images for signs of fraud, tampering, or forgery
+    without performing OCR or field extraction. Use this for testing document authenticity.
+
+    **Claude Vision Analysis detects:**
+    - **Specimen/Sample documents**: Educational examples with visual markers, placeholder names
+    - **Photo tampering**: Edge artifacts, blending issues, lighting/color mismatches
+    - **Screen captures**: Pixel patterns, screen glare, refresh lines
+
+    **Returns:**
+    - Risk level (low/medium/high/critical)
+    - Recommended action (accept/review/reject)
+    - Detailed findings for each check
+
+    Supported formats: PNG, JPG, JPEG, TIFF, BMP, WEBP, PDF
+    """
+    request_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    client_ip = request.client.host if request.client else "unknown"
+
+    logger.info(f"[{request_id}] INTEGRITY TEST REQUEST: /ocr/test/integrity")
+    logger.info(f"[{request_id}]   Client IP: {client_ip}")
+    logger.info(f"[{request_id}]   Filename: {file.filename}")
+
+    if file.content_type not in ALLOWED_EXTRACT_TYPES:
+        logger.warning(f"[{request_id}]   Rejected: Unsupported file type")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file.content_type}. "
+                   f"Allowed types: {', '.join(ALLOWED_EXTRACT_TYPES)}"
+        )
+
+    start_time = time.time()
+
+    try:
+        file_bytes = await file.read()
+        file_size_kb = len(file_bytes) / 1024
+        logger.info(f"[{request_id}]   File size: {file_size_kb:.2f} KB")
+
+        # Handle PDF files - convert first page to image
+        if file.content_type == "application/pdf":
+            logger.info(f"[{request_id}]   Processing PDF - converting first page to image")
+            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if len(pdf_doc) == 0:
+                raise ValueError("PDF has no pages")
+            page = pdf_doc[0]
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat)
+            image_bytes = pix.tobytes("png")
+            pdf_doc.close()
+            detected_format = "PNG (from PDF)"
+        else:
+            image_bytes = file_bytes
+            img = Image.open(BytesIO(image_bytes))
+            detected_format = img.format.upper() if img.format else "Unknown"
+
+            # Convert TIFF/BMP to PNG for processing
+            if detected_format in ["TIFF", "BMP"]:
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                output = BytesIO()
+                img.save(output, format="PNG")
+                image_bytes = output.getvalue()
+
+        # Get image info
+        img = Image.open(BytesIO(image_bytes))
+        image_info = {
+            "width": img.size[0],
+            "height": img.size[1],
+            "format": detected_format,
+            "mode": img.mode,
+            "file_size_kb": round(file_size_kb, 2)
+        }
+
+        logger.info(f"[{request_id}]   Image: {img.size[0]}x{img.size[1]} {detected_format}")
+
+        # Run Claude Vision analysis
+        logger.info(f"[{request_id}]   Running Claude Vision integrity analysis...")
+
+        # Determine media type for Claude
+        img_format = detected_format.upper()
+        if "PNG" in img_format:
+            media_type = "image/png"
+        elif "JPEG" in img_format or "JPG" in img_format:
+            media_type = "image/jpeg"
+        elif "WEBP" in img_format:
+            media_type = "image/webp"
+        else:
+            media_type = "image/png"
+
+        claude_result = ClaudeIntegrityAnalyzer.analyze(image_bytes, media_type)
+
+        # Build Claude analysis response model
+        claude_analysis = None
+        claude_summary = None
+
+        if claude_result.get("analysis_completed"):
+            # Build specimen document analysis
+            specimen_data = claude_result.get("specimen_document", {})
+            claude_specimen = ClaudeSpecimenDocumentAnalysis(
+                is_specimen=specimen_data.get("is_specimen", False),
+                confidence=specimen_data.get("confidence", 0),
+                findings=specimen_data.get("findings", []),
+                details=specimen_data.get("details")
+            )
+
+            # Build photo tampering analysis
+            photo_data = claude_result.get("photo_tampering", {})
+            claude_photo = ClaudePhotoTamperingAnalysis(
+                is_suspicious=photo_data.get("is_suspicious", False),
+                confidence=photo_data.get("confidence", 0),
+                findings=photo_data.get("findings", []),
+                details=photo_data.get("details")
+            )
+
+            # Build screen capture analysis
+            screen_data = claude_result.get("screen_capture", {})
+            claude_screen = ClaudeScreenCaptureAnalysis(
+                is_suspicious=screen_data.get("is_suspicious", False),
+                confidence=screen_data.get("confidence", 0),
+                findings=screen_data.get("findings", []),
+                details=screen_data.get("details")
+            )
+
+            # Build overall assessment
+            overall_data = claude_result.get("overall_assessment", {})
+            claude_overall = ClaudeOverallAssessment(
+                is_likely_fraudulent=overall_data.get("is_likely_fraudulent", False),
+                fraud_confidence=overall_data.get("fraud_confidence", 0),
+                risk_level=overall_data.get("risk_level", "unknown"),
+                summary=overall_data.get("summary", ""),
+                recommended_action=overall_data.get("recommended_action", "review")
+            )
+
+            claude_analysis = ClaudeAnalysisResult(
+                analysis_completed=True,
+                specimen_document=claude_specimen,
+                photo_tampering=claude_photo,
+                screen_capture=claude_screen,
+                overall_assessment=claude_overall,
+                error=None
+            )
+
+            # Build summary
+            summary_result = ClaudeIntegrityAnalyzer.get_summary(claude_result)
+            issues_detected = [
+                ClaudeAnalysisIssue(
+                    type=issue["type"],
+                    confidence=issue["confidence"],
+                    findings=issue["findings"]
+                )
+                for issue in summary_result.get("issues_detected", [])
+            ]
+
+            claude_summary = ClaudeAnalysisSummary(
+                is_fraudulent=summary_result.get("is_fraudulent", False),
+                confidence=summary_result.get("confidence", 0),
+                risk_level=summary_result.get("risk_level", "unknown"),
+                issues_detected=issues_detected,
+                recommendation=summary_result.get("recommendation", "review"),
+                summary=summary_result.get("summary"),
+                error=summary_result.get("error")
+            )
+
+            logger.info(f"[{request_id}]   Claude Analysis: is_fraudulent={claude_summary.is_fraudulent}, risk_level={claude_summary.risk_level}")
+            if claude_summary.is_fraudulent:
+                logger.warning(f"[{request_id}]   CLAUDE DETECTED FRAUD: {claude_summary.summary}")
+        else:
+            claude_analysis = ClaudeAnalysisResult(
+                analysis_completed=False,
+                error=claude_result.get("error", "Analysis failed")
+            )
+            logger.error(f"[{request_id}]   Claude analysis failed: {claude_result.get('error')}")
+
+        # Calculate overall integrity based on Claude's assessment
+        integrity_issues = []
+        if claude_summary and claude_summary.is_fraudulent:
+            integrity_issues.append("fraud_detected")
+
+        integrity_score = 1.0
+        if claude_summary:
+            integrity_score -= claude_summary.confidence
+        integrity_score = max(0.0, integrity_score)
+
+        document_integrity = DocumentIntegrityResult(
+            is_valid=len(integrity_issues) == 0,
+            fake_detection=None,
+            integrity_score=round(integrity_score, 2)
+        )
+
+        processing_time = time.time() - start_time
+
+        logger.info(f"[{request_id}]   Integrity: is_valid={document_integrity.is_valid}, score={document_integrity.integrity_score}")
+        logger.info(f"[{request_id}]   Processing time: {round(processing_time, 3)}s")
+
+        return IntegrityTestResponse(
+            success=True,
+            claude_analysis=claude_analysis,
+            claude_summary=claude_summary,
+            document_integrity=document_integrity,
+            image_info=image_info,
+            processing_time_seconds=round(processing_time, 3),
+            error=None
+        )
+
+    except Exception as e:
+        processing_time = time.time() - start_time
+        logger.error(f"[{request_id}] ERROR: {str(e)}")
+
+        return IntegrityTestResponse(
+            success=False,
+            processing_time_seconds=round(processing_time, 3),
+            error=str(e)
+        )
