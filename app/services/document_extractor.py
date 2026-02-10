@@ -51,9 +51,20 @@ IMPORTANT for Canadian Driver's Licences (Ontario, BC, etc.):
 - The FIRST word/part is the LAST NAME (surname/family name)
 - The SECOND word/part is the FIRST NAME (given name)
 - The first letter of Ontario driver's licence number corresponds to the LAST NAME
+
+CRITICAL for Ontario Driver's Licence NAME FORMAT (Two-Line Layout):
+- Ontario DLs display names on TWO LINES under "NAME/NOM":
+  - LINE 1: Last name only (may have trailing comma)
+  - LINE 2: First name(s) - multiple given names separated by COMMAS
+- Extract the ENTIRE second line as first_name, INCLUDING any commas
+- The commas separate first name from middle name(s) - DO NOT remove them
 - Examples:
-  - "SMITH JOHN" -> last_name="SMITH", first_name="JOHN"
-  - "SMITH, JOHN" -> last_name="SMITH", first_name="JOHN"
+  - Line 1: "MCCORMICK," / Line 2: "RACHAEL,LOUISE"
+    -> last_name="MCCORMICK", first_name="RACHAEL,LOUISE"
+  - Line 1: "SMITH," / Line 2: "JOHN,ROBERT,JAMES"
+    -> last_name="SMITH", first_name="JOHN,ROBERT,JAMES"
+  - Line 1: "TANVER," / Line 2: "ADYAN"
+    -> last_name="TANVER", first_name="ADYAN"
 
 CRITICAL for Ontario Driver's Licence Name Verification:
 - The license number FIRST LETTER must match the LAST NAME initial
