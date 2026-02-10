@@ -58,3 +58,7 @@ run_server.bat
 # Temp files
 *.txt
 !README.md
+
+# Large test document folders
+documents/
+prod_issues/
